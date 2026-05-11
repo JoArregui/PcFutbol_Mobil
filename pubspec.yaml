@@ -1,0 +1,51 @@
+name: pcfutbol_2026
+description: "Renacimiento del simulador de gestión futbolística líder - PC Fútbol 2026."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  cupertino_icons: ^1.0.6
+  font_awesome_flutter: ^10.7.0
+
+  isar: ^3.1.0
+  isar_flutter_libs: ^3.1.0
+
+  path_provider: ^2.1.2
+  
+  google_fonts: ^6.1.0
+  intl: ^0.19.0
+  http: ^1.6.0
+  flutter_dotenv: ^6.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  isar_generator: ^3.1.0
+  build_runner: ^2.4.8
+
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/.env
+    - assets/data/players.json
+    # - assets/images/
+    # - assets/ui/trophies/
+
+  # He comentado la sección de fuentes completa para evitar el error de lista vacía
+  # fonts:
+  #   - family: Urbanist
+  #     fonts:
+  #       - asset: assets/fonts/Urbanist-Regular.ttf
+  #       - asset: assets/fonts/Urbanist-Bold.ttf
+  #         weight: 700
