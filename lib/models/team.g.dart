@@ -46,6 +46,11 @@ const TeamSchema = CollectionSchema(
       id: 5,
       name: r'stadium',
       type: IsarType.string,
+    ),
+    r'stadiumCapacity': PropertySchema(
+      id: 6,
+      name: r'stadiumCapacity',
+      type: IsarType.long,
     )
   },
   estimateSize: _teamEstimateSize,
@@ -101,6 +106,7 @@ void _teamSerialize(
   writer.writeString(offsets[3], object.logoUrl);
   writer.writeString(offsets[4], object.name);
   writer.writeString(offsets[5], object.stadium);
+  writer.writeLong(offsets[6], object.stadiumCapacity);
 }
 
 Team _teamDeserialize(
@@ -116,6 +122,7 @@ Team _teamDeserialize(
     logoUrl: reader.readString(offsets[3]),
     name: reader.readString(offsets[4]),
     stadium: reader.readString(offsets[5]),
+    stadiumCapacity: reader.readLong(offsets[6]),
   );
   object.id = id;
   return object;
@@ -140,6 +147,8 @@ P _teamDeserializeProp<P>(
       return (reader.readString(offset)) as P;
     case 5:
       return (reader.readString(offset)) as P;
+    case 6:
+      return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -1050,6 +1059,59 @@ extension TeamQueryFilter on QueryBuilder<Team, Team, QFilterCondition> {
       ));
     });
   }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition> stadiumCapacityEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'stadiumCapacity',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition> stadiumCapacityGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'stadiumCapacity',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition> stadiumCapacityLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'stadiumCapacity',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition> stadiumCapacityBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'stadiumCapacity',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
 }
 
 extension TeamQueryObject on QueryBuilder<Team, Team, QFilterCondition> {}
@@ -1126,6 +1188,18 @@ extension TeamQuerySortBy on QueryBuilder<Team, Team, QSortBy> {
   QueryBuilder<Team, Team, QAfterSortBy> sortByStadiumDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'stadium', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> sortByStadiumCapacity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'stadiumCapacity', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> sortByStadiumCapacityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'stadiumCapacity', Sort.desc);
     });
   }
 }
@@ -1214,6 +1288,18 @@ extension TeamQuerySortThenBy on QueryBuilder<Team, Team, QSortThenBy> {
       return query.addSortBy(r'stadium', Sort.desc);
     });
   }
+
+  QueryBuilder<Team, Team, QAfterSortBy> thenByStadiumCapacity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'stadiumCapacity', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> thenByStadiumCapacityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'stadiumCapacity', Sort.desc);
+    });
+  }
 }
 
 extension TeamQueryWhereDistinct on QueryBuilder<Team, Team, QDistinct> {
@@ -1254,6 +1340,12 @@ extension TeamQueryWhereDistinct on QueryBuilder<Team, Team, QDistinct> {
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'stadium', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Team, Team, QDistinct> distinctByStadiumCapacity() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'stadiumCapacity');
     });
   }
 }
@@ -1298,6 +1390,12 @@ extension TeamQueryProperty on QueryBuilder<Team, Team, QQueryProperty> {
   QueryBuilder<Team, String, QQueryOperations> stadiumProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'stadium');
+    });
+  }
+
+  QueryBuilder<Team, int, QQueryOperations> stadiumCapacityProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'stadiumCapacity');
     });
   }
 }

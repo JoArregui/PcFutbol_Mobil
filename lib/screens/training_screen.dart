@@ -2,10 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/training_engine.dart';
 import '../core/database_service.dart';
+import '../core/game_session_service.dart';
+import '../core/message_service.dart';
+import '../models/game_message.dart';
+import '../models/team.dart';
 
 class TrainingScreen extends StatefulWidget {
   final DatabaseService dbService;
-  const TrainingScreen({super.key, required this.dbService});
+  final Team userTeam;
+
+  const TrainingScreen({super.key, required this.dbService, required this.userTeam});
 
   @override
   State<TrainingScreen> createState() => _TrainingScreenState();
@@ -23,20 +29,36 @@ class _TrainingScreenState extends State<TrainingScreen> {
     TrainingFocus.tactical: {"icon": FontAwesomeIcons.clipboardList, "label": "Táctico", "desc": "Estrategia mixta de equipo."},
   };
 
-  void _executeTraining() async {
+  Future<void> _executeTraining() async {
     if (_selectedFocus == null) return;
 
     setState(() => _isTraining = true);
 
+    final session = GameSessionService(widget.dbService.isar);
+    final multiplier = await session.trainingMultiplier();
     final engine = TrainingEngine(widget.dbService.isar);
-    // Asumimos "USER_TEAM" como el ID de tu equipo
-    await engine.trainTeam("USER_TEAM", _selectedFocus!);
+    final improved = await engine.trainTeam(
+      widget.userTeam.apiId,
+      _selectedFocus!,
+      staffMultiplier: multiplier,
+    );
 
-    // Animación de éxito
+    await MessageService(widget.dbService.isar).add(
+      title: "Sesión de entrenamiento",
+      body: improved > 0
+          ? "$improved jugadores han mejorado sus atributos."
+          : "Sesión táctica sin progreso visible esta semana.",
+      type: MessageType.training,
+    );
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("¡Entrenamiento de ${_focusData[_selectedFocus!]['label']} finalizado!"),
+          content: Text(
+            improved > 0
+                ? "¡Sesión de ${_focusData[_selectedFocus!]['label']}! $improved jugadores mejoraron."
+                : "Sesión completada. El equipo no progresó esta vez.",
+          ),
           backgroundColor: const Color(0xFFDEFF9A),
         ),
       );
@@ -61,12 +83,19 @@ class _TrainingScreenState extends State<TrainingScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text("SELECCIONA EL ENFOQUE SEMANAL", 
-              style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+            Text(
+              "PLANTILLA: ${widget.userTeam.name.toUpperCase()}",
+              style: const TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              "SELECCIONA EL ENFOQUE SEMANAL",
+              style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 20),
             Expanded(
               child: ListView(
-                children: _focusData.entries.map((entry) => _buildFocusCard(entry.key)).toList(),
+                children: _focusData.entries.map((e) => _buildFocusCard(e.key)).toList(),
               ),
             ),
             const SizedBox(height: 20),
@@ -78,8 +107,8 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   Widget _buildFocusCard(TrainingFocus focus) {
-    bool isSelected = _selectedFocus == focus;
-    var data = _focusData[focus];
+    final isSelected = _selectedFocus == focus;
+    final data = _focusData[focus];
 
     return GestureDetector(
       onTap: () => setState(() => _selectedFocus = focus),
@@ -90,10 +119,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFFDEFF9A).withOpacity(0.1) : const Color(0xFF0F172A),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? const Color(0xFFDEFF9A) : Colors.transparent,
-            width: 2,
-          ),
+          border: Border.all(color: isSelected ? const Color(0xFFDEFF9A) : Colors.transparent, width: 2),
         ),
         child: Row(
           children: [
@@ -125,9 +151,9 @@ class _TrainingScreenState extends State<TrainingScreen> {
         disabledBackgroundColor: Colors.white10,
       ),
       onPressed: (_selectedFocus == null || _isTraining) ? null : _executeTraining,
-      child: _isTraining 
-        ? const CircularProgressIndicator(color: Colors.black)
-        : const Text("INICIAR SESIÓN", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+      child: _isTraining
+          ? const CircularProgressIndicator(color: Colors.black)
+          : const Text("INICIAR SESIÓN", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
     );
   }
 }

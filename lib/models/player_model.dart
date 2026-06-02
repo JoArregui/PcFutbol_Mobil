@@ -29,6 +29,38 @@ class Player {
   @enumerated
   late Personality personality;
 
+  /// Días restantes de lesión (0 = apto)
+  int injuredDays = 0;
+
+  /// Partidos de sanción pendientes
+  int suspendedMatches = 0;
+
+  /// Jugador de cantera (no cuenta en plantilla profesional hasta promoción)
+  bool isYouth = false;
+
+  int contractYearsRemaining = 3;
+
+  String nationality = 'ESP';
+
+  /// Cedido a nosotros desde otro club (0 = no)
+  int onLoanFromTeamApiId = 0;
+
+  int onLoanUntilMatchday = 0;
+
+  /// Nuestro jugador cedido a otro (0 = no)
+  int loanedOutToTeamApiId = 0;
+
+  int loanedOutUntilMatchday = 0;
+
+  /// Jugador inventado por el motor local (no proviene de API).
+  bool isGenerated = false;
+
+  /// Marcador interno para apuestas jóvenes con progresión acelerada.
+  bool isUnicorn = false;
+
+  /// Techo de atributos (1–99). Las apuestas jóvenes suelen tener 88–99.
+  int potential = 82;
+
   /// Getter para calcular la media global del jugador basada en sus stats
   double get average {
     if (stats.isEmpty) return 0.0;

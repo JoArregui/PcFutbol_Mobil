@@ -1,17 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/player_model.dart';
+import '../models/team.dart';
 import '../widgets/radar_chart.dart';
 import '../core/database_service.dart';
+import '../core/finance_service.dart';
+import 'transfer_negotiation_screen.dart';
 
 class PlayerDetailScreen extends StatelessWidget {
   final Player player;
-  final DatabaseService dbService; // Añadido para consistencia con la navegación
+  final DatabaseService dbService;
+  final Team userTeam;
 
   const PlayerDetailScreen({
-    super.key, 
-    required this.player, 
+    super.key,
+    required this.player,
     required this.dbService,
+    required this.userTeam,
   });
 
   @override
@@ -109,6 +114,13 @@ class PlayerDetailScreen extends StatelessWidget {
           
           _rowInfo("Valor de Mercado", "${(player.marketValue / 1000000).toStringAsFixed(1)}M €"),
           _rowInfo("Ficha Anual", "${(player.salary / 1000).toStringAsFixed(0)}K €"),
+          _rowInfo("Contrato", "${player.contractYearsRemaining} temporada(s)"),
+          if (player.onLoanFromTeamApiId > 0)
+            _rowInfo("Cesión", "Hasta jornada ${player.onLoanUntilMatchday}"),
+          if (player.nationality.isNotEmpty) _rowInfo("Nacionalidad", player.nationality),
+          if (player.age <= 20 && player.potential >= 88)
+            _rowInfo("Perfil", "APUESTA DE FUTURO"),
+          _rowInfo("Potencial", "${player.potential}"),
         ],
       ),
     );
@@ -143,10 +155,28 @@ class PlayerDetailScreen extends StatelessWidget {
   }
 
   Widget _buildActionButtons(BuildContext context) {
+    final isOurs = player.teamApiId == userTeam.apiId && !player.isYouth;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 20),
       child: Column(
         children: [
+          if (player.injuredDays > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'LESIONADO — ${player.injuredDays} días',
+                style: GoogleFonts.urbanist(color: Colors.redAccent, fontWeight: FontWeight.bold),
+              ),
+            ),
+          if (player.suspendedMatches > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'SANCIONADO — ${player.suspendedMatches} partido(s)',
+                style: GoogleFonts.urbanist(color: Colors.amber, fontWeight: FontWeight.bold),
+              ),
+            ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFDEFF9A),
@@ -155,14 +185,62 @@ class PlayerDetailScreen extends StatelessWidget {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               elevation: 0,
             ),
-            onPressed: () {
-              // Lógica de negociación
-            },
+            onPressed: isOurs
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => TransferNegotiationScreen(
+                          player: player,
+                          userTeam: userTeam,
+                          dbService: dbService,
+                        ),
+                      ),
+                    );
+                  },
             child: Text(
-              "INICIAR NEGOCIACIÓN", 
-              style: GoogleFonts.urbanist(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5)
+              isOurs ? "EN TU PLANTILLA" : "NEGOCIAR FICHAJE",
+              style: GoogleFonts.urbanist(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5),
             ),
           ),
+          if (isOurs) ...[
+            const SizedBox(height: 12),
+            OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.redAccent,
+                side: const BorderSide(color: Colors.redAccent),
+                minimumSize: const Size(double.infinity, 52),
+              ),
+              onPressed: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    backgroundColor: const Color(0xFF0F172A),
+                    title: const Text('Vender jugador', style: TextStyle(color: Colors.white)),
+                    content: Text(
+                      '¿Ceder a ${player.name} por ~${(player.marketValue * 0.85 / 1e6).toStringAsFixed(2)} M€?',
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('CANCELAR')),
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('VENDER', style: TextStyle(color: Color(0xFFDEFF9A))),
+                      ),
+                    ],
+                  ),
+                );
+                if (ok != true || !context.mounted) return;
+                final msg = await FinanceService(dbService.isar)
+                    .sellPlayer(player, userTeam.apiId);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+                if (msg.startsWith('Vendido')) Navigator.pop(context);
+              },
+              child: const Text('CEDER JUGADOR', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
         ],
       ),
     );

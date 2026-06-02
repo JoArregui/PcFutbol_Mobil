@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import '../core/api_service.dart';
+import '../core/squad_service.dart';
 import '../models/player_model.dart';
 import '../models/team.dart';
 import '../core/database_service.dart';
@@ -26,21 +25,13 @@ class _SquadScreenState extends State<SquadScreen> {
     _loadSquad();
   }
 
-  void _loadSquad() async {
-    // 1. Intentamos leer de la DB local
-    var localPlayers = await widget.dbService.getPlayersByTeam(widget.team.apiId);
-    
-    // 2. Si está vacía, pedimos a la API solo para ESTE equipo
-    if (localPlayers.isEmpty) {
-      final api = ApiService();
-      await api.syncTeamSquad(widget.team.apiId, widget.dbService);
-      localPlayers = await widget.dbService.getPlayersByTeam(widget.team.apiId);
-    }
-
-    // 3. Al asignar el valor dentro de setState, el FutureBuilder se reconstruye solo
+  Future<void> _loadSquad() async {
+    final squad = SquadService.fromDatabase(widget.dbService);
+    final players = await squad.ensureSquad(widget.team.apiId);
+    final pros = players.where((p) => !p.isYouth).toList();
     if (mounted) {
       setState(() {
-        _squadFuture = Future.value(localPlayers);
+        _squadFuture = Future.value(pros);
       });
     }
   }
@@ -74,9 +65,14 @@ class _SquadScreenState extends State<SquadScreen> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: const Icon(FontAwesomeIcons.chartLine, color: Color(0xFFDEFF9A)),
-            onPressed: () {},
-          )
+            icon: const Icon(Icons.refresh, color: Color(0xFFDEFF9A)),
+            tooltip: 'Actualizar plantilla',
+            onPressed: () async {
+              setState(() => _squadFuture = null);
+              await SquadService.fromDatabase(widget.dbService).ensureSquad(widget.team.apiId, tryApiFirst: true);
+              await _loadSquad();
+            },
+          ),
         ],
       ),
       // CAMBIO 2: Manejamos el estado inicial nulo del Future
@@ -192,6 +188,7 @@ class _SquadScreenState extends State<SquadScreen> {
             builder: (context) => PlayerDetailScreen(
               player: player,
               dbService: widget.dbService,
+              userTeam: widget.team,
             ),
           ),
         );
@@ -221,9 +218,17 @@ class _SquadScreenState extends State<SquadScreen> {
             const SizedBox(width: 15),
             Expanded(
               flex: 5,
-              child: Text(player.name.toUpperCase(), 
+              child: Text(
+                player.name.toUpperCase(),
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, letterSpacing: 0.5)),
+                style: TextStyle(
+                  color: (player.age <= 20 && player.potential >= 88)
+                      ? const Color(0xFFDEFF9A)
+                      : Colors.white,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: 0.5,
+                ),
+              ),
             ),
             Expanded(
               flex: 1,

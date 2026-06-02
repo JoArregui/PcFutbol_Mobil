@@ -27,44 +27,104 @@ const PlayerSchema = CollectionSchema(
       name: r'average',
       type: IsarType.double,
     ),
-    r'marketValue': PropertySchema(
+    r'contractYearsRemaining': PropertySchema(
       id: 2,
+      name: r'contractYearsRemaining',
+      type: IsarType.long,
+    ),
+    r'injuredDays': PropertySchema(
+      id: 3,
+      name: r'injuredDays',
+      type: IsarType.long,
+    ),
+    r'isGenerated': PropertySchema(
+      id: 4,
+      name: r'isGenerated',
+      type: IsarType.bool,
+    ),
+    r'isUnicorn': PropertySchema(
+      id: 5,
+      name: r'isUnicorn',
+      type: IsarType.bool,
+    ),
+    r'isYouth': PropertySchema(
+      id: 6,
+      name: r'isYouth',
+      type: IsarType.bool,
+    ),
+    r'loanedOutToTeamApiId': PropertySchema(
+      id: 7,
+      name: r'loanedOutToTeamApiId',
+      type: IsarType.long,
+    ),
+    r'loanedOutUntilMatchday': PropertySchema(
+      id: 8,
+      name: r'loanedOutUntilMatchday',
+      type: IsarType.long,
+    ),
+    r'marketValue': PropertySchema(
+      id: 9,
       name: r'marketValue',
       type: IsarType.double,
     ),
     r'name': PropertySchema(
-      id: 3,
+      id: 10,
       name: r'name',
       type: IsarType.string,
     ),
+    r'nationality': PropertySchema(
+      id: 11,
+      name: r'nationality',
+      type: IsarType.string,
+    ),
+    r'onLoanFromTeamApiId': PropertySchema(
+      id: 12,
+      name: r'onLoanFromTeamApiId',
+      type: IsarType.long,
+    ),
+    r'onLoanUntilMatchday': PropertySchema(
+      id: 13,
+      name: r'onLoanUntilMatchday',
+      type: IsarType.long,
+    ),
     r'personality': PropertySchema(
-      id: 4,
+      id: 14,
       name: r'personality',
       type: IsarType.byte,
       enumMap: _PlayerpersonalityEnumValueMap,
     ),
     r'position': PropertySchema(
-      id: 5,
+      id: 15,
       name: r'position',
       type: IsarType.string,
     ),
+    r'potential': PropertySchema(
+      id: 16,
+      name: r'potential',
+      type: IsarType.long,
+    ),
     r'salary': PropertySchema(
-      id: 6,
+      id: 17,
       name: r'salary',
       type: IsarType.double,
     ),
     r'stats': PropertySchema(
-      id: 7,
+      id: 18,
       name: r'stats',
       type: IsarType.longList,
     ),
+    r'suspendedMatches': PropertySchema(
+      id: 19,
+      name: r'suspendedMatches',
+      type: IsarType.long,
+    ),
     r'teamApiId': PropertySchema(
-      id: 8,
+      id: 20,
       name: r'teamApiId',
       type: IsarType.long,
     ),
     r'teamId': PropertySchema(
-      id: 9,
+      id: 21,
       name: r'teamId',
       type: IsarType.string,
     )
@@ -130,6 +190,7 @@ int _playerEstimateSize(
 ) {
   var bytesCount = offsets.last;
   bytesCount += 3 + object.name.length * 3;
+  bytesCount += 3 + object.nationality.length * 3;
   bytesCount += 3 + object.position.length * 3;
   bytesCount += 3 + object.stats.length * 8;
   bytesCount += 3 + object.teamId.length * 3;
@@ -144,14 +205,26 @@ void _playerSerialize(
 ) {
   writer.writeLong(offsets[0], object.age);
   writer.writeDouble(offsets[1], object.average);
-  writer.writeDouble(offsets[2], object.marketValue);
-  writer.writeString(offsets[3], object.name);
-  writer.writeByte(offsets[4], object.personality.index);
-  writer.writeString(offsets[5], object.position);
-  writer.writeDouble(offsets[6], object.salary);
-  writer.writeLongList(offsets[7], object.stats);
-  writer.writeLong(offsets[8], object.teamApiId);
-  writer.writeString(offsets[9], object.teamId);
+  writer.writeLong(offsets[2], object.contractYearsRemaining);
+  writer.writeLong(offsets[3], object.injuredDays);
+  writer.writeBool(offsets[4], object.isGenerated);
+  writer.writeBool(offsets[5], object.isUnicorn);
+  writer.writeBool(offsets[6], object.isYouth);
+  writer.writeLong(offsets[7], object.loanedOutToTeamApiId);
+  writer.writeLong(offsets[8], object.loanedOutUntilMatchday);
+  writer.writeDouble(offsets[9], object.marketValue);
+  writer.writeString(offsets[10], object.name);
+  writer.writeString(offsets[11], object.nationality);
+  writer.writeLong(offsets[12], object.onLoanFromTeamApiId);
+  writer.writeLong(offsets[13], object.onLoanUntilMatchday);
+  writer.writeByte(offsets[14], object.personality.index);
+  writer.writeString(offsets[15], object.position);
+  writer.writeLong(offsets[16], object.potential);
+  writer.writeDouble(offsets[17], object.salary);
+  writer.writeLongList(offsets[18], object.stats);
+  writer.writeLong(offsets[19], object.suspendedMatches);
+  writer.writeLong(offsets[20], object.teamApiId);
+  writer.writeString(offsets[21], object.teamId);
 }
 
 Player _playerDeserialize(
@@ -162,17 +235,29 @@ Player _playerDeserialize(
 ) {
   final object = Player();
   object.age = reader.readLong(offsets[0]);
+  object.contractYearsRemaining = reader.readLong(offsets[2]);
   object.id = id;
-  object.marketValue = reader.readDouble(offsets[2]);
-  object.name = reader.readString(offsets[3]);
+  object.injuredDays = reader.readLong(offsets[3]);
+  object.isGenerated = reader.readBool(offsets[4]);
+  object.isUnicorn = reader.readBool(offsets[5]);
+  object.isYouth = reader.readBool(offsets[6]);
+  object.loanedOutToTeamApiId = reader.readLong(offsets[7]);
+  object.loanedOutUntilMatchday = reader.readLong(offsets[8]);
+  object.marketValue = reader.readDouble(offsets[9]);
+  object.name = reader.readString(offsets[10]);
+  object.nationality = reader.readString(offsets[11]);
+  object.onLoanFromTeamApiId = reader.readLong(offsets[12]);
+  object.onLoanUntilMatchday = reader.readLong(offsets[13]);
   object.personality =
-      _PlayerpersonalityValueEnumMap[reader.readByteOrNull(offsets[4])] ??
+      _PlayerpersonalityValueEnumMap[reader.readByteOrNull(offsets[14])] ??
           Personality.ambitious;
-  object.position = reader.readString(offsets[5]);
-  object.salary = reader.readDouble(offsets[6]);
-  object.stats = reader.readLongList(offsets[7]) ?? [];
-  object.teamApiId = reader.readLongOrNull(offsets[8]);
-  object.teamId = reader.readString(offsets[9]);
+  object.position = reader.readString(offsets[15]);
+  object.potential = reader.readLong(offsets[16]);
+  object.salary = reader.readDouble(offsets[17]);
+  object.stats = reader.readLongList(offsets[18]) ?? [];
+  object.suspendedMatches = reader.readLong(offsets[19]);
+  object.teamApiId = reader.readLongOrNull(offsets[20]);
+  object.teamId = reader.readString(offsets[21]);
   return object;
 }
 
@@ -188,21 +273,45 @@ P _playerDeserializeProp<P>(
     case 1:
       return (reader.readDouble(offset)) as P;
     case 2:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 3:
-      return (reader.readString(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 4:
+      return (reader.readBool(offset)) as P;
+    case 5:
+      return (reader.readBool(offset)) as P;
+    case 6:
+      return (reader.readBool(offset)) as P;
+    case 7:
+      return (reader.readLong(offset)) as P;
+    case 8:
+      return (reader.readLong(offset)) as P;
+    case 9:
+      return (reader.readDouble(offset)) as P;
+    case 10:
+      return (reader.readString(offset)) as P;
+    case 11:
+      return (reader.readString(offset)) as P;
+    case 12:
+      return (reader.readLong(offset)) as P;
+    case 13:
+      return (reader.readLong(offset)) as P;
+    case 14:
       return (_PlayerpersonalityValueEnumMap[reader.readByteOrNull(offset)] ??
           Personality.ambitious) as P;
-    case 5:
+    case 15:
       return (reader.readString(offset)) as P;
-    case 6:
+    case 16:
+      return (reader.readLong(offset)) as P;
+    case 17:
       return (reader.readDouble(offset)) as P;
-    case 7:
+    case 18:
       return (reader.readLongList(offset) ?? []) as P;
-    case 8:
+    case 19:
+      return (reader.readLong(offset)) as P;
+    case 20:
       return (reader.readLongOrNull(offset)) as P;
-    case 9:
+    case 21:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -728,6 +837,62 @@ extension PlayerQueryFilter on QueryBuilder<Player, Player, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      contractYearsRemainingEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'contractYearsRemaining',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      contractYearsRemainingGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'contractYearsRemaining',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      contractYearsRemainingLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'contractYearsRemaining',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      contractYearsRemainingBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'contractYearsRemaining',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<Player, Player, QAfterFilterCondition> idEqualTo(Id value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -772,6 +937,201 @@ extension PlayerQueryFilter on QueryBuilder<Player, Player, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'id',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> injuredDaysEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'injuredDays',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> injuredDaysGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'injuredDays',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> injuredDaysLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'injuredDays',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> injuredDaysBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'injuredDays',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> isGeneratedEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isGenerated',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> isUnicornEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isUnicorn',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> isYouthEqualTo(
+      bool value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'isYouth',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      loanedOutToTeamApiIdEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'loanedOutToTeamApiId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      loanedOutToTeamApiIdGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'loanedOutToTeamApiId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      loanedOutToTeamApiIdLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'loanedOutToTeamApiId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      loanedOutToTeamApiIdBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'loanedOutToTeamApiId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      loanedOutUntilMatchdayEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'loanedOutUntilMatchday',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      loanedOutUntilMatchdayGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'loanedOutUntilMatchday',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      loanedOutUntilMatchdayLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'loanedOutUntilMatchday',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      loanedOutUntilMatchdayBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'loanedOutUntilMatchday',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -971,6 +1331,248 @@ extension PlayerQueryFilter on QueryBuilder<Player, Player, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Player, Player, QAfterFilterCondition> nationalityEqualTo(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'nationality',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> nationalityGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'nationality',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> nationalityLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'nationality',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> nationalityBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'nationality',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> nationalityStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'nationality',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> nationalityEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'nationality',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> nationalityContains(
+      String value,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'nationality',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> nationalityMatches(
+      String pattern,
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'nationality',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> nationalityIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'nationality',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> nationalityIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'nationality',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      onLoanFromTeamApiIdEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'onLoanFromTeamApiId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      onLoanFromTeamApiIdGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'onLoanFromTeamApiId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      onLoanFromTeamApiIdLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'onLoanFromTeamApiId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      onLoanFromTeamApiIdBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'onLoanFromTeamApiId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      onLoanUntilMatchdayEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'onLoanUntilMatchday',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      onLoanUntilMatchdayGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'onLoanUntilMatchday',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      onLoanUntilMatchdayLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'onLoanUntilMatchday',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      onLoanUntilMatchdayBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'onLoanUntilMatchday',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<Player, Player, QAfterFilterCondition> personalityEqualTo(
       Personality value) {
     return QueryBuilder.apply(this, (query) {
@@ -1150,6 +1752,59 @@ extension PlayerQueryFilter on QueryBuilder<Player, Player, QFilterCondition> {
       return query.addFilterCondition(FilterCondition.greaterThan(
         property: r'position',
         value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> potentialEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'potential',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> potentialGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'potential',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> potentialLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'potential',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> potentialBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'potential',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
       ));
     });
   }
@@ -1350,6 +2005,60 @@ extension PlayerQueryFilter on QueryBuilder<Player, Player, QFilterCondition> {
         upper,
         includeUpper,
       );
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> suspendedMatchesEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'suspendedMatches',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition>
+      suspendedMatchesGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'suspendedMatches',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> suspendedMatchesLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'suspendedMatches',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> suspendedMatchesBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'suspendedMatches',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
     });
   }
 
@@ -1582,6 +2291,92 @@ extension PlayerQuerySortBy on QueryBuilder<Player, Player, QSortBy> {
     });
   }
 
+  QueryBuilder<Player, Player, QAfterSortBy> sortByContractYearsRemaining() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'contractYearsRemaining', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy>
+      sortByContractYearsRemainingDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'contractYearsRemaining', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByInjuredDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'injuredDays', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByInjuredDaysDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'injuredDays', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByIsGenerated() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isGenerated', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByIsGeneratedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isGenerated', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByIsUnicorn() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isUnicorn', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByIsUnicornDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isUnicorn', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByIsYouth() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isYouth', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByIsYouthDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isYouth', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByLoanedOutToTeamApiId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanedOutToTeamApiId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByLoanedOutToTeamApiIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanedOutToTeamApiId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByLoanedOutUntilMatchday() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanedOutUntilMatchday', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy>
+      sortByLoanedOutUntilMatchdayDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanedOutUntilMatchday', Sort.desc);
+    });
+  }
+
   QueryBuilder<Player, Player, QAfterSortBy> sortByMarketValue() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'marketValue', Sort.asc);
@@ -1603,6 +2398,42 @@ extension PlayerQuerySortBy on QueryBuilder<Player, Player, QSortBy> {
   QueryBuilder<Player, Player, QAfterSortBy> sortByNameDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'name', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByNationality() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'nationality', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByNationalityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'nationality', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByOnLoanFromTeamApiId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'onLoanFromTeamApiId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByOnLoanFromTeamApiIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'onLoanFromTeamApiId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByOnLoanUntilMatchday() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'onLoanUntilMatchday', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByOnLoanUntilMatchdayDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'onLoanUntilMatchday', Sort.desc);
     });
   }
 
@@ -1630,6 +2461,18 @@ extension PlayerQuerySortBy on QueryBuilder<Player, Player, QSortBy> {
     });
   }
 
+  QueryBuilder<Player, Player, QAfterSortBy> sortByPotential() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'potential', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByPotentialDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'potential', Sort.desc);
+    });
+  }
+
   QueryBuilder<Player, Player, QAfterSortBy> sortBySalary() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'salary', Sort.asc);
@@ -1639,6 +2482,18 @@ extension PlayerQuerySortBy on QueryBuilder<Player, Player, QSortBy> {
   QueryBuilder<Player, Player, QAfterSortBy> sortBySalaryDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'salary', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortBySuspendedMatches() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'suspendedMatches', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortBySuspendedMatchesDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'suspendedMatches', Sort.desc);
     });
   }
 
@@ -1692,6 +2547,19 @@ extension PlayerQuerySortThenBy on QueryBuilder<Player, Player, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Player, Player, QAfterSortBy> thenByContractYearsRemaining() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'contractYearsRemaining', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy>
+      thenByContractYearsRemainingDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'contractYearsRemaining', Sort.desc);
+    });
+  }
+
   QueryBuilder<Player, Player, QAfterSortBy> thenById() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.asc);
@@ -1701,6 +2569,79 @@ extension PlayerQuerySortThenBy on QueryBuilder<Player, Player, QSortThenBy> {
   QueryBuilder<Player, Player, QAfterSortBy> thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByInjuredDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'injuredDays', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByInjuredDaysDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'injuredDays', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByIsGenerated() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isGenerated', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByIsGeneratedDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isGenerated', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByIsUnicorn() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isUnicorn', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByIsUnicornDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isUnicorn', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByIsYouth() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isYouth', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByIsYouthDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isYouth', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByLoanedOutToTeamApiId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanedOutToTeamApiId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByLoanedOutToTeamApiIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanedOutToTeamApiId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByLoanedOutUntilMatchday() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanedOutUntilMatchday', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy>
+      thenByLoanedOutUntilMatchdayDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanedOutUntilMatchday', Sort.desc);
     });
   }
 
@@ -1728,6 +2669,42 @@ extension PlayerQuerySortThenBy on QueryBuilder<Player, Player, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Player, Player, QAfterSortBy> thenByNationality() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'nationality', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByNationalityDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'nationality', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByOnLoanFromTeamApiId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'onLoanFromTeamApiId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByOnLoanFromTeamApiIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'onLoanFromTeamApiId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByOnLoanUntilMatchday() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'onLoanUntilMatchday', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByOnLoanUntilMatchdayDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'onLoanUntilMatchday', Sort.desc);
+    });
+  }
+
   QueryBuilder<Player, Player, QAfterSortBy> thenByPersonality() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'personality', Sort.asc);
@@ -1752,6 +2729,18 @@ extension PlayerQuerySortThenBy on QueryBuilder<Player, Player, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Player, Player, QAfterSortBy> thenByPotential() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'potential', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByPotentialDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'potential', Sort.desc);
+    });
+  }
+
   QueryBuilder<Player, Player, QAfterSortBy> thenBySalary() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'salary', Sort.asc);
@@ -1761,6 +2750,18 @@ extension PlayerQuerySortThenBy on QueryBuilder<Player, Player, QSortThenBy> {
   QueryBuilder<Player, Player, QAfterSortBy> thenBySalaryDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'salary', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenBySuspendedMatches() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'suspendedMatches', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenBySuspendedMatchesDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'suspendedMatches', Sort.desc);
     });
   }
 
@@ -1802,6 +2803,48 @@ extension PlayerQueryWhereDistinct on QueryBuilder<Player, Player, QDistinct> {
     });
   }
 
+  QueryBuilder<Player, Player, QDistinct> distinctByContractYearsRemaining() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'contractYearsRemaining');
+    });
+  }
+
+  QueryBuilder<Player, Player, QDistinct> distinctByInjuredDays() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'injuredDays');
+    });
+  }
+
+  QueryBuilder<Player, Player, QDistinct> distinctByIsGenerated() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isGenerated');
+    });
+  }
+
+  QueryBuilder<Player, Player, QDistinct> distinctByIsUnicorn() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isUnicorn');
+    });
+  }
+
+  QueryBuilder<Player, Player, QDistinct> distinctByIsYouth() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isYouth');
+    });
+  }
+
+  QueryBuilder<Player, Player, QDistinct> distinctByLoanedOutToTeamApiId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'loanedOutToTeamApiId');
+    });
+  }
+
+  QueryBuilder<Player, Player, QDistinct> distinctByLoanedOutUntilMatchday() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'loanedOutUntilMatchday');
+    });
+  }
+
   QueryBuilder<Player, Player, QDistinct> distinctByMarketValue() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'marketValue');
@@ -1812,6 +2855,25 @@ extension PlayerQueryWhereDistinct on QueryBuilder<Player, Player, QDistinct> {
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'name', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Player, Player, QDistinct> distinctByNationality(
+      {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'nationality', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Player, Player, QDistinct> distinctByOnLoanFromTeamApiId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'onLoanFromTeamApiId');
+    });
+  }
+
+  QueryBuilder<Player, Player, QDistinct> distinctByOnLoanUntilMatchday() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'onLoanUntilMatchday');
     });
   }
 
@@ -1828,6 +2890,12 @@ extension PlayerQueryWhereDistinct on QueryBuilder<Player, Player, QDistinct> {
     });
   }
 
+  QueryBuilder<Player, Player, QDistinct> distinctByPotential() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'potential');
+    });
+  }
+
   QueryBuilder<Player, Player, QDistinct> distinctBySalary() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'salary');
@@ -1837,6 +2905,12 @@ extension PlayerQueryWhereDistinct on QueryBuilder<Player, Player, QDistinct> {
   QueryBuilder<Player, Player, QDistinct> distinctByStats() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'stats');
+    });
+  }
+
+  QueryBuilder<Player, Player, QDistinct> distinctBySuspendedMatches() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'suspendedMatches');
     });
   }
 
@@ -1873,6 +2947,48 @@ extension PlayerQueryProperty on QueryBuilder<Player, Player, QQueryProperty> {
     });
   }
 
+  QueryBuilder<Player, int, QQueryOperations> contractYearsRemainingProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'contractYearsRemaining');
+    });
+  }
+
+  QueryBuilder<Player, int, QQueryOperations> injuredDaysProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'injuredDays');
+    });
+  }
+
+  QueryBuilder<Player, bool, QQueryOperations> isGeneratedProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isGenerated');
+    });
+  }
+
+  QueryBuilder<Player, bool, QQueryOperations> isUnicornProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isUnicorn');
+    });
+  }
+
+  QueryBuilder<Player, bool, QQueryOperations> isYouthProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isYouth');
+    });
+  }
+
+  QueryBuilder<Player, int, QQueryOperations> loanedOutToTeamApiIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'loanedOutToTeamApiId');
+    });
+  }
+
+  QueryBuilder<Player, int, QQueryOperations> loanedOutUntilMatchdayProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'loanedOutUntilMatchday');
+    });
+  }
+
   QueryBuilder<Player, double, QQueryOperations> marketValueProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'marketValue');
@@ -1882,6 +2998,24 @@ extension PlayerQueryProperty on QueryBuilder<Player, Player, QQueryProperty> {
   QueryBuilder<Player, String, QQueryOperations> nameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'name');
+    });
+  }
+
+  QueryBuilder<Player, String, QQueryOperations> nationalityProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'nationality');
+    });
+  }
+
+  QueryBuilder<Player, int, QQueryOperations> onLoanFromTeamApiIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'onLoanFromTeamApiId');
+    });
+  }
+
+  QueryBuilder<Player, int, QQueryOperations> onLoanUntilMatchdayProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'onLoanUntilMatchday');
     });
   }
 
@@ -1897,6 +3031,12 @@ extension PlayerQueryProperty on QueryBuilder<Player, Player, QQueryProperty> {
     });
   }
 
+  QueryBuilder<Player, int, QQueryOperations> potentialProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'potential');
+    });
+  }
+
   QueryBuilder<Player, double, QQueryOperations> salaryProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'salary');
@@ -1906,6 +3046,12 @@ extension PlayerQueryProperty on QueryBuilder<Player, Player, QQueryProperty> {
   QueryBuilder<Player, List<int>, QQueryOperations> statsProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'stats');
+    });
+  }
+
+  QueryBuilder<Player, int, QQueryOperations> suspendedMatchesProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'suspendedMatches');
     });
   }
 

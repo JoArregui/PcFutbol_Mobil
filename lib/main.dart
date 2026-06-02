@@ -1,27 +1,28 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Añadida la importación
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/database_service.dart';
-import 'screens/team_selection_screen.dart';
+import 'screens/title_screen.dart';
 
-// Agregamos 'async' para poder usar 'await'
 void main() async {
-  // Asegura que los bindings de Flutter estén listos
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Cargamos el archivo de variables de entorno
+  // Cargamos variables de entorno antes de lanzar la App
   await dotenv.load(fileName: "assets/.env");
   
-  runApp(const PCFutbol2026());
+  // Instanciamos el servicio fuera del build para que sea único
+  final dbService = DatabaseService();
+  
+  runApp(PCFutbol2026(dbService: dbService));
 }
 
 class PCFutbol2026 extends StatelessWidget {
-  const PCFutbol2026({super.key});
+  final DatabaseService dbService;
+
+  // Pasamos el servicio por el constructor
+  const PCFutbol2026({super.key, required this.dbService});
 
   @override
   Widget build(BuildContext context) {
-    // Instanciamos el servicio de base de datos
-    final dbService = DatabaseService();
-
     return MaterialApp(
       title: 'PC Fútbol 2026',
       debugShowCheckedModeBanner: false,
@@ -31,41 +32,60 @@ class PCFutbol2026 extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF020617),
         useMaterial3: true,
       ),
+      // El FutureBuilder asegura que la UI no se bloquee durante la carga masiva
       home: FutureBuilder(
         future: dbService.init(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
-            return TeamSelectionScreen(dbService: dbService);
-          } else {
-            return const Scaffold(
+            return TitleScreen(dbService: dbService);
+          } 
+          
+          if (snapshot.hasError) {
+            return Scaffold(
               body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDEFF9A)),
-                    ),
-                    SizedBox(height: 25),
-                    Text(
-                      "PC FÚTBOL 2026",
-                      style: TextStyle(
-                        color: Color(0xFFDEFF9A),
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 4,
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    Text(
-                      "OPTIMIZANDO BASE DE DATOS...",
-                      style: TextStyle(color: Colors.white54, fontSize: 12),
-                    ),
-                  ],
-                ),
+                child: Text("ERROR AL CARGAR DATOS: ${snapshot.error}"),
               ),
             );
           }
+
+          // Pantalla de carga con estilo PC Fútbol
+          return _buildLoadingScreen();
         },
+      ),
+    );
+  }
+
+  Widget _buildLoadingScreen() {
+    return const Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDEFF9A)),
+              strokeWidth: 2,
+            ),
+            SizedBox(height: 30),
+            Text(
+              "PC FÚTBOL 2026",
+              style: TextStyle(
+                color: Color(0xFFDEFF9A),
+                fontSize: 28,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 6,
+              ),
+            ),
+            SizedBox(height: 10),
+            Text(
+              "PREPARANDO TEMPORADA...",
+              style: TextStyle(
+                color: Colors.white24, 
+                fontSize: 12,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

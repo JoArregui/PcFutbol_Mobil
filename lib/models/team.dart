@@ -4,15 +4,16 @@ part 'team.g.dart';
 
 @collection
 class Team {
-  Id id = Isar.autoIncrement; // Isar necesita un entero
-  
+  Id id = Isar.autoIncrement;
+
   @Index(unique: true)
-  final int apiId; // El ID que viene de la API (ej: 541 para el Real Madrid)
+  final int apiId; 
   
   final String name;
   final String city;
-  final String stadium;
-  final String logoUrl; // Usaremos la URL directa de la API
+  final String stadium; // Este es el nombre del estadio
+  final int stadiumCapacity; // NUEVO: Para gestionar ingresos y ampliaciones
+  final String logoUrl;
   final int budget;
 
   Team({
@@ -20,20 +21,23 @@ class Team {
     required this.name,
     required this.city,
     required this.stadium,
+    required this.stadiumCapacity,
     required this.logoUrl,
     required this.budget,
   });
 
-  // Convertir JSON de la API a nuestro modelo
   factory Team.fromJson(Map<String, dynamic> json) {
-    final venue = json['team']['venue'];
+    final venue = json['venue']; // A veces viene en la raíz o dentro de 'team'
+    
     return Team(
       apiId: json['team']['id'],
       name: json['team']['name'] ?? "Equipo Desconocido",
-     city: (venue != null) ? (venue['city'] ?? "Ciudad Desconocida") : "Ciudad Desconocida",
-      stadium: (venue != null) ? (venue['name'] ?? "Estadio Genérico") : "Estadio Genérico",
+      city: venue != null ? (venue['city'] ?? "Ciudad Desconocida") : "Ciudad Desconocida",
+      stadium: venue != null ? (venue['name'] ?? "Estadio Genérico") : "Estadio Genérico",
+      // Capturamos la capacidad de la API, si no existe ponemos 15.000 por defecto
+      stadiumCapacity: venue != null ? (venue['capacity'] ?? 15000) : 15000,
       logoUrl: json['team']['logo'] ?? "",
-      budget: 50000000, // Presupuesto base inicial
+      budget: 50000000,
     );
   }
 }
