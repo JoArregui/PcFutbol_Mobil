@@ -6,10 +6,10 @@ part 'finance_model.g.dart';
 class ClubFinance {
   Id id = Isar.autoIncrement;
 
-  late double balance;         // Dinero en caja
+  late double balance;         // Dinero en caja (Afectado por el crédito)
   late double transferBudget;  // Presupuesto para fichajes
   late double wageBill;        // Masa salarial actual
-  late double maxWageBill;     // Límite de masa salarial impuesto por el club (puede variar según el equipo)
+  late double maxWageBill;     // Límite de masa salarial impuesto por el club
   
   double ticketPrice = 20.0;
   double stadiumMaintenance = 50000.0;
@@ -24,4 +24,8 @@ class ClubFinance {
 
   /// Ampliación de grada (PC Fútbol 7 — obras en el estadio)
   int stadiumExtraCapacity = 0;
+
+  // NUEVOS CAMPOS: Control de crédito bancario persistente
+  double loanAmount = 0.0;     // Capital pendiente de devolución del préstamo
+  int loanWeeks = 0;           // Semanas restantes para liquidar la deuda
 }

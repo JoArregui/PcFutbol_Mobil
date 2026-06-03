@@ -27,104 +27,109 @@ const PlayerSchema = CollectionSchema(
       name: r'average',
       type: IsarType.double,
     ),
-    r'contractYearsRemaining': PropertySchema(
+    r'buyoutClause': PropertySchema(
       id: 2,
+      name: r'buyoutClause',
+      type: IsarType.double,
+    ),
+    r'contractYearsRemaining': PropertySchema(
+      id: 3,
       name: r'contractYearsRemaining',
       type: IsarType.long,
     ),
     r'injuredDays': PropertySchema(
-      id: 3,
+      id: 4,
       name: r'injuredDays',
       type: IsarType.long,
     ),
     r'isGenerated': PropertySchema(
-      id: 4,
+      id: 5,
       name: r'isGenerated',
       type: IsarType.bool,
     ),
     r'isUnicorn': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'isUnicorn',
       type: IsarType.bool,
     ),
     r'isYouth': PropertySchema(
-      id: 6,
+      id: 7,
       name: r'isYouth',
       type: IsarType.bool,
     ),
     r'loanedOutToTeamApiId': PropertySchema(
-      id: 7,
+      id: 8,
       name: r'loanedOutToTeamApiId',
       type: IsarType.long,
     ),
     r'loanedOutUntilMatchday': PropertySchema(
-      id: 8,
+      id: 9,
       name: r'loanedOutUntilMatchday',
       type: IsarType.long,
     ),
     r'marketValue': PropertySchema(
-      id: 9,
+      id: 10,
       name: r'marketValue',
       type: IsarType.double,
     ),
     r'name': PropertySchema(
-      id: 10,
+      id: 11,
       name: r'name',
       type: IsarType.string,
     ),
     r'nationality': PropertySchema(
-      id: 11,
+      id: 12,
       name: r'nationality',
       type: IsarType.string,
     ),
     r'onLoanFromTeamApiId': PropertySchema(
-      id: 12,
+      id: 13,
       name: r'onLoanFromTeamApiId',
       type: IsarType.long,
     ),
     r'onLoanUntilMatchday': PropertySchema(
-      id: 13,
+      id: 14,
       name: r'onLoanUntilMatchday',
       type: IsarType.long,
     ),
     r'personality': PropertySchema(
-      id: 14,
+      id: 15,
       name: r'personality',
       type: IsarType.byte,
       enumMap: _PlayerpersonalityEnumValueMap,
     ),
     r'position': PropertySchema(
-      id: 15,
+      id: 16,
       name: r'position',
       type: IsarType.string,
     ),
     r'potential': PropertySchema(
-      id: 16,
+      id: 17,
       name: r'potential',
       type: IsarType.long,
     ),
     r'salary': PropertySchema(
-      id: 17,
+      id: 18,
       name: r'salary',
       type: IsarType.double,
     ),
     r'stats': PropertySchema(
-      id: 18,
+      id: 19,
       name: r'stats',
       type: IsarType.longList,
     ),
     r'suspendedMatches': PropertySchema(
-      id: 19,
+      id: 20,
       name: r'suspendedMatches',
       type: IsarType.long,
     ),
     r'teamApiId': PropertySchema(
-      id: 20,
+      id: 21,
       name: r'teamApiId',
       type: IsarType.long,
     ),
     r'teamId': PropertySchema(
-      id: 21,
+      id: 22,
       name: r'teamId',
       type: IsarType.string,
     )
@@ -205,26 +210,27 @@ void _playerSerialize(
 ) {
   writer.writeLong(offsets[0], object.age);
   writer.writeDouble(offsets[1], object.average);
-  writer.writeLong(offsets[2], object.contractYearsRemaining);
-  writer.writeLong(offsets[3], object.injuredDays);
-  writer.writeBool(offsets[4], object.isGenerated);
-  writer.writeBool(offsets[5], object.isUnicorn);
-  writer.writeBool(offsets[6], object.isYouth);
-  writer.writeLong(offsets[7], object.loanedOutToTeamApiId);
-  writer.writeLong(offsets[8], object.loanedOutUntilMatchday);
-  writer.writeDouble(offsets[9], object.marketValue);
-  writer.writeString(offsets[10], object.name);
-  writer.writeString(offsets[11], object.nationality);
-  writer.writeLong(offsets[12], object.onLoanFromTeamApiId);
-  writer.writeLong(offsets[13], object.onLoanUntilMatchday);
-  writer.writeByte(offsets[14], object.personality.index);
-  writer.writeString(offsets[15], object.position);
-  writer.writeLong(offsets[16], object.potential);
-  writer.writeDouble(offsets[17], object.salary);
-  writer.writeLongList(offsets[18], object.stats);
-  writer.writeLong(offsets[19], object.suspendedMatches);
-  writer.writeLong(offsets[20], object.teamApiId);
-  writer.writeString(offsets[21], object.teamId);
+  writer.writeDouble(offsets[2], object.buyoutClause);
+  writer.writeLong(offsets[3], object.contractYearsRemaining);
+  writer.writeLong(offsets[4], object.injuredDays);
+  writer.writeBool(offsets[5], object.isGenerated);
+  writer.writeBool(offsets[6], object.isUnicorn);
+  writer.writeBool(offsets[7], object.isYouth);
+  writer.writeLong(offsets[8], object.loanedOutToTeamApiId);
+  writer.writeLong(offsets[9], object.loanedOutUntilMatchday);
+  writer.writeDouble(offsets[10], object.marketValue);
+  writer.writeString(offsets[11], object.name);
+  writer.writeString(offsets[12], object.nationality);
+  writer.writeLong(offsets[13], object.onLoanFromTeamApiId);
+  writer.writeLong(offsets[14], object.onLoanUntilMatchday);
+  writer.writeByte(offsets[15], object.personality.index);
+  writer.writeString(offsets[16], object.position);
+  writer.writeLong(offsets[17], object.potential);
+  writer.writeDouble(offsets[18], object.salary);
+  writer.writeLongList(offsets[19], object.stats);
+  writer.writeLong(offsets[20], object.suspendedMatches);
+  writer.writeLong(offsets[21], object.teamApiId);
+  writer.writeString(offsets[22], object.teamId);
 }
 
 Player _playerDeserialize(
@@ -235,29 +241,30 @@ Player _playerDeserialize(
 ) {
   final object = Player();
   object.age = reader.readLong(offsets[0]);
-  object.contractYearsRemaining = reader.readLong(offsets[2]);
+  object.buyoutClause = reader.readDouble(offsets[2]);
+  object.contractYearsRemaining = reader.readLong(offsets[3]);
   object.id = id;
-  object.injuredDays = reader.readLong(offsets[3]);
-  object.isGenerated = reader.readBool(offsets[4]);
-  object.isUnicorn = reader.readBool(offsets[5]);
-  object.isYouth = reader.readBool(offsets[6]);
-  object.loanedOutToTeamApiId = reader.readLong(offsets[7]);
-  object.loanedOutUntilMatchday = reader.readLong(offsets[8]);
-  object.marketValue = reader.readDouble(offsets[9]);
-  object.name = reader.readString(offsets[10]);
-  object.nationality = reader.readString(offsets[11]);
-  object.onLoanFromTeamApiId = reader.readLong(offsets[12]);
-  object.onLoanUntilMatchday = reader.readLong(offsets[13]);
+  object.injuredDays = reader.readLong(offsets[4]);
+  object.isGenerated = reader.readBool(offsets[5]);
+  object.isUnicorn = reader.readBool(offsets[6]);
+  object.isYouth = reader.readBool(offsets[7]);
+  object.loanedOutToTeamApiId = reader.readLong(offsets[8]);
+  object.loanedOutUntilMatchday = reader.readLong(offsets[9]);
+  object.marketValue = reader.readDouble(offsets[10]);
+  object.name = reader.readString(offsets[11]);
+  object.nationality = reader.readString(offsets[12]);
+  object.onLoanFromTeamApiId = reader.readLong(offsets[13]);
+  object.onLoanUntilMatchday = reader.readLong(offsets[14]);
   object.personality =
-      _PlayerpersonalityValueEnumMap[reader.readByteOrNull(offsets[14])] ??
+      _PlayerpersonalityValueEnumMap[reader.readByteOrNull(offsets[15])] ??
           Personality.ambitious;
-  object.position = reader.readString(offsets[15]);
-  object.potential = reader.readLong(offsets[16]);
-  object.salary = reader.readDouble(offsets[17]);
-  object.stats = reader.readLongList(offsets[18]) ?? [];
-  object.suspendedMatches = reader.readLong(offsets[19]);
-  object.teamApiId = reader.readLongOrNull(offsets[20]);
-  object.teamId = reader.readString(offsets[21]);
+  object.position = reader.readString(offsets[16]);
+  object.potential = reader.readLong(offsets[17]);
+  object.salary = reader.readDouble(offsets[18]);
+  object.stats = reader.readLongList(offsets[19]) ?? [];
+  object.suspendedMatches = reader.readLong(offsets[20]);
+  object.teamApiId = reader.readLongOrNull(offsets[21]);
+  object.teamId = reader.readString(offsets[22]);
   return object;
 }
 
@@ -273,45 +280,47 @@ P _playerDeserializeProp<P>(
     case 1:
       return (reader.readDouble(offset)) as P;
     case 2:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 3:
       return (reader.readLong(offset)) as P;
     case 4:
-      return (reader.readBool(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 5:
       return (reader.readBool(offset)) as P;
     case 6:
       return (reader.readBool(offset)) as P;
     case 7:
-      return (reader.readLong(offset)) as P;
+      return (reader.readBool(offset)) as P;
     case 8:
       return (reader.readLong(offset)) as P;
     case 9:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 10:
-      return (reader.readString(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 11:
       return (reader.readString(offset)) as P;
     case 12:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 13:
       return (reader.readLong(offset)) as P;
     case 14:
+      return (reader.readLong(offset)) as P;
+    case 15:
       return (_PlayerpersonalityValueEnumMap[reader.readByteOrNull(offset)] ??
           Personality.ambitious) as P;
-    case 15:
-      return (reader.readString(offset)) as P;
     case 16:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 17:
-      return (reader.readDouble(offset)) as P;
-    case 18:
-      return (reader.readLongList(offset) ?? []) as P;
-    case 19:
       return (reader.readLong(offset)) as P;
+    case 18:
+      return (reader.readDouble(offset)) as P;
+    case 19:
+      return (reader.readLongList(offset) ?? []) as P;
     case 20:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 21:
+      return (reader.readLongOrNull(offset)) as P;
+    case 22:
       return (reader.readString(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -828,6 +837,68 @@ extension PlayerQueryFilter on QueryBuilder<Player, Player, QFilterCondition> {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'average',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> buyoutClauseEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'buyoutClause',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> buyoutClauseGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'buyoutClause',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> buyoutClauseLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'buyoutClause',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterFilterCondition> buyoutClauseBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'buyoutClause',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -2291,6 +2362,18 @@ extension PlayerQuerySortBy on QueryBuilder<Player, Player, QSortBy> {
     });
   }
 
+  QueryBuilder<Player, Player, QAfterSortBy> sortByBuyoutClause() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buyoutClause', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> sortByBuyoutClauseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buyoutClause', Sort.desc);
+    });
+  }
+
   QueryBuilder<Player, Player, QAfterSortBy> sortByContractYearsRemaining() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'contractYearsRemaining', Sort.asc);
@@ -2544,6 +2627,18 @@ extension PlayerQuerySortThenBy on QueryBuilder<Player, Player, QSortThenBy> {
   QueryBuilder<Player, Player, QAfterSortBy> thenByAverageDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'average', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByBuyoutClause() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buyoutClause', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterSortBy> thenByBuyoutClauseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buyoutClause', Sort.desc);
     });
   }
 
@@ -2803,6 +2898,12 @@ extension PlayerQueryWhereDistinct on QueryBuilder<Player, Player, QDistinct> {
     });
   }
 
+  QueryBuilder<Player, Player, QDistinct> distinctByBuyoutClause() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'buyoutClause');
+    });
+  }
+
   QueryBuilder<Player, Player, QDistinct> distinctByContractYearsRemaining() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'contractYearsRemaining');
@@ -2944,6 +3045,12 @@ extension PlayerQueryProperty on QueryBuilder<Player, Player, QQueryProperty> {
   QueryBuilder<Player, double, QQueryOperations> averageProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'average');
+    });
+  }
+
+  QueryBuilder<Player, double, QQueryOperations> buyoutClauseProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'buyoutClause');
     });
   }
 

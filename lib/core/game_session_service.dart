@@ -57,6 +57,41 @@ class GameSessionService {
     return isar.teams.filter().apiIdEqualTo(rivalId).findFirst();
   }
 
+  /// Verifica si el usuario ha jugado su partido y avanza la jornada simulando el resto.
+  Future<void> checkAndAdvanceMatchday(Team userTeam) async {
+    final save = await getSave();
+    if (save == null || save.seasonFinished) return;
+
+    final calendarService = CalendarService(isar);
+    final pendingFixtures = await calendarService.getUserPendingFixtures(userTeam.apiId);
+
+    // Si ya no quedan partidos del usuario pendientes en esta jornada, cerramos la jornada global
+    if (pendingFixtures.isEmpty) {
+      final leagueService = LeagueService(isar);
+      
+      // Simula el resto de partidos de la IA para la jornada actual
+      await leagueService.simulateRestOfMatchday(save.currentMatchday, userTeam.apiId);
+
+      // Avanzamos los parámetros del guardado hacia la nueva semana
+      await isar.writeTxn(() async {
+        if (save.currentMatchday >= save.totalMatchdays) {
+          save.seasonFinished = true;
+        } else {
+          save.currentMatchday++;
+          save.currentDay = 1; // Volvemos al Lunes (Día 1) de la nueva jornada
+        }
+        await isar.gameSaves.put(save);
+      });
+
+      // Enviamos notificación de resumen semanal a través del secretario
+      await MessageService(isar).add(
+        title: "Nueva Jornada ${save.currentMatchday}",
+        body: "La jornada anterior ha concluido. Consulta las clasificaciones actualizadas y planifica los entrenamientos de esta semana.",
+        type: MessageType.general,
+      );
+    }
+  }
+
   Future<void> startSeason(Team userTeam, Map<StaffRole, StaffMember> staff) async {
     final league = LeagueService(isar);
     await league.createSeason(userTeam.apiId);
@@ -94,7 +129,8 @@ class GameSessionService {
     await SquadService(isar).ensureSquad(userTeam.apiId);
     await LineupService(isar).autoPickBest11(userTeam.apiId);
     await CalendarService(isar).initCupForSeason(userTeam.apiId);
-    await YouthService(isar).scoutYouth(userTeam.apiId);
+    
+    await YouthService(isar).scoutYouth(teamApiId: userTeam.apiId, count: 4);
 
     final msg = MessageService(isar);
     await msg.add(
@@ -140,7 +176,9 @@ class GameSessionService {
 
     await LeagueService(isar).createSeason(userTeam.apiId);
     await CalendarService(isar).initCupForSeason(userTeam.apiId);
-    await YouthService(isar).scoutYouth(userTeam.apiId);
+    
+    await YouthService(isar).scoutYouth(teamApiId: userTeam.apiId, count: 4);
+    
     await SquadService(isar).ensureAllTeams();
     await LineupService(isar).autoPickBest11(userTeam.apiId);
 

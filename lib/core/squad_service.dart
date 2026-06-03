@@ -6,8 +6,10 @@ import '../models/game_save.dart';
 import 'api_service.dart';
 import 'database_service.dart';
 import 'player_generator.dart';
+import 'dart:math' as math;
 
 /// Garantiza plantilla por equipo: API + relleno inventado progresivo.
+/// Setea las condiciones de inicio respetando un mínimo del 70% de jugadores reales.
 class SquadService {
   final Isar isar;
   final ApiService _api = ApiService();
@@ -18,6 +20,9 @@ class SquadService {
 
   static const minSquadSize = 20;
   static const preferredSquadSize = 24;
+  
+  /// Regla de Oro para la generación inicial: Máximo 30% de jugadores inventados.
+  static const maxGeneratedRatio = 0.30; 
 
   Future<List<Player>> ensureSquad(int teamApiId, {bool tryApiFirst = true}) async {
     var players = await isar.players.filter().teamApiIdEqualTo(teamApiId).findAll();
@@ -29,9 +34,14 @@ class SquadService {
       players = await isar.players.filter().teamApiIdEqualTo(teamApiId).findAll();
     }
 
-    final realCount = players.where((p) => !p.isGenerated).length;
-    final generatedCount = players.length - realCount;
-    final maxGeneratedBySeason = (preferredSquadSize * _generatedRatioForSeason(season)).floor();
+    // Contamos los reales profesionales activos, ya que los canteranos no forman 
+    // parte del primer equipo visible en el SquadScreen de inicio.
+    final realCount = players.where((p) => !p.isGenerated && !p.isYouth).length;
+    final generatedCount = players.length - players.where((p) => !p.isGenerated).length;
+    
+    // El ratio se ajusta por temporada del juego para la CPU, limitado por el tope de inicio.
+    final double seasonRatio = math.min(_generatedRatioForSeason(season), maxGeneratedRatio);
+    final maxGeneratedBySeason = (preferredSquadSize * seasonRatio).floor();
 
     final desiredGenerated = _desiredGeneratedCount(
       realCount: realCount,
@@ -39,7 +49,10 @@ class SquadService {
       maxGeneratedBySeason: maxGeneratedBySeason,
     );
 
-    final desiredTotal = (realCount + desiredGenerated).clamp(minSquadSize, preferredSquadSize);
+    final int lowerLimit = math.min(minSquadSize, preferredSquadSize);
+    final int upperLimit = math.max(minSquadSize, preferredSquadSize);
+    final desiredTotal = (realCount + desiredGenerated).clamp(lowerLimit, upperLimit);
+    
     final needed = desiredTotal - players.length;
 
     if (needed > 0) {
@@ -52,9 +65,10 @@ class SquadService {
       await _replaceSquad(teamApiId, players);
     }
 
-    final finalReal = players.where((p) => !p.isGenerated).length;
-    final finalPct = players.isEmpty ? 0 : (finalReal * 100 / players.length);
-    debugPrint('📊 Equipo $teamApiId real/local: $finalReal/${players.length} (${finalPct.toStringAsFixed(1)}%)');
+    final finalReal = players.where((p) => !p.isGenerated && !p.isYouth).length;
+    final finalTotal = players.where((p) => !p.isYouth).length;
+    final finalPct = finalTotal == 0 ? 0 : (finalReal * 100 / finalTotal);
+    debugPrint('📊 Equipo $teamApiId real profesional local: $finalReal/$finalTotal (${finalPct.toStringAsFixed(1)}%)');
 
     return players;
   }
@@ -64,22 +78,25 @@ class SquadService {
     required int currentGenerated,
     required int maxGeneratedBySeason,
   }) {
-    // Si hay pocos reales, priorizamos jugabilidad (mínimo 20), aunque baje del 85%.
+    // Si la API no responde o hay escasez crítica de reales en la base de datos de origen:
     if (realCount < minSquadSize) {
-      final neededForPlayable = minSquadSize - realCount;
-      return neededForPlayable.clamp(currentGenerated, preferredSquadSize);
+      final maxAllowedGenerated = (preferredSquadSize * maxGeneratedRatio).floor();
+      final neededForPlayable = math.min(minSquadSize - realCount, maxAllowedGenerated);
+      
+      final int minLimit = math.min(currentGenerated, maxAllowedGenerated);
+      final int maxLimit = math.max(currentGenerated, maxAllowedGenerated);
+      
+      return neededForPlayable.clamp(minLimit, maxLimit);
     }
 
-    // Objetivo de realismo: no superar el porcentaje inventado por temporada.
     return currentGenerated > maxGeneratedBySeason ? currentGenerated : maxGeneratedBySeason;
   }
 
   double _generatedRatioForSeason(int season) {
-    if (season <= 1) return 0.15; // 85% real mínimo objetivo
-    if (season == 2) return 0.22;
-    if (season == 3) return 0.30;
-    if (season == 4) return 0.38;
-    return 0.45; // transición hacia futuro inventado
+    if (season <= 1) return 0.15; // 85% real objetivo
+    if (season == 2) return 0.22; // 78% real objetivo
+    if (season == 3) return 0.28; // 72% real objetivo
+    return maxGeneratedRatio;     // 0.30 -> Límite absoluto del 30% de inventados
   }
 
   Future<int> _currentSeason() async {
@@ -105,6 +122,6 @@ class SquadService {
         await Future.delayed(const Duration(milliseconds: 400));
       }
     }
-    debugPrint('✅ Plantillas revisadas para ${teams.length} equipos.');
+    debugPrint('✅ Plantillas iniciales revisadas para ${teams.length} equipos.');
   }
 }

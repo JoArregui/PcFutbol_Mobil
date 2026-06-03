@@ -28,7 +28,8 @@ class ApiService {
     }
 
     if (apiKey.isEmpty) {
-      throw Exception('API Key no configurada en assets/.env (FOOTBALL_API_KEY)');
+      throw Exception(
+          'API Key no configurada en assets/.env (FOOTBALL_API_KEY)');
     }
 
     for (final season in _seasonsToTry) {
@@ -38,7 +39,8 @@ class ApiService {
     throw Exception('No se pudieron descargar equipos de la liga $leagueId');
   }
 
-  Future<bool> _fetchAndSaveTeams(int leagueId, String season, DatabaseService db) async {
+  Future<bool> _fetchAndSaveTeams(
+      int leagueId, String season, DatabaseService db) async {
     debugPrint('📡 GET teams?league=$leagueId&season=$season');
 
     final response = await http.get(
@@ -71,7 +73,8 @@ class ApiService {
     return true;
   }
 
-  Future<void> syncTeamSquad(int teamId, DatabaseService db, {bool force = false}) async {
+  Future<void> syncTeamSquad(int teamId, DatabaseService db,
+      {bool force = false}) async {
     if (!force) {
       final existing = await db.getPlayersByTeam(teamId);
       if (existing.length >= 20) return;
@@ -106,7 +109,8 @@ class ApiService {
         return;
       }
 
-      final playersRaw = (responseList.first as Map<String, dynamic>)['players'] as List?;
+      final playersRaw =
+          (responseList.first as Map<String, dynamic>)['players'] as List?;
       if (playersRaw == null || playersRaw.isEmpty) {
         await _fallbackGeneratedSquad(teamId, db);
         return;
@@ -122,6 +126,16 @@ class ApiService {
         final pos = _translatePosition(p['position'] as String?);
         final stats = _statsForPosition(pos, age);
         final isYoungBet = age <= 19 && _rng.nextDouble() < 0.1;
+        final personality = isYoungBet
+            ? Personality.ambitious
+            : Personality.values[_rng.nextInt(Personality.values.length)];
+
+        final marketValue = _estimateValue(stats, age);
+        final salary = PlayerGenerator.salaryFromValue(marketValue, age);
+        final contractYears =
+            PlayerGenerator.contractDuration(age, personality);
+        final buyoutClause = PlayerGenerator.buyoutClause(
+            marketValue, personality, contractYears);
 
         players.add(Player()
           ..name = name
@@ -130,17 +144,21 @@ class ApiService {
           ..teamApiId = teamId
           ..teamId = 'API'
           ..stats = stats
-          ..marketValue = _estimateValue(stats, age)
-          ..salary = 80000.0 + age * 2500.0
-          ..personality = isYoungBet ? Personality.ambitious : Personality.professional
-          ..contractYearsRemaining = 2 + (age % 4)
+          ..marketValue = marketValue
+          ..salary = salary
+          ..buyoutClause = buyoutClause
+          ..contractYearsRemaining = contractYears
+          ..personality = personality
           ..nationality = 'ESP'
           ..isGenerated = false
           ..isUnicorn = isYoungBet
-          ..potential = isYoungBet ? 88 + _rng.nextInt(8) : _ceilingFromStats(stats, age));
+          ..potential = isYoungBet
+              ? 88 + _rng.nextInt(8)
+              : _ceilingFromStats(stats, age));
       }
       await db.replaceTeamSquad(teamId, players);
-      debugPrint('✅ Equipo $teamId: ${players.length} jugadores reales de API');
+      debugPrint(
+          '✅ Equipo $teamId: ${players.length} jugadores reales con contratos generados');
     } catch (e) {
       debugPrint('❌ squads team=$teamId: $e');
       await _fallbackGeneratedSquad(teamId, db);
@@ -150,7 +168,8 @@ class ApiService {
   Future<void> _fallbackGeneratedSquad(int teamId, DatabaseService db) async {
     final squad = PlayerGenerator.generateFullSquad(teamId, seasonNumber: 1);
     await db.replaceTeamSquad(teamId, squad);
-    debugPrint('🎲 Plantilla inventada para $teamId (${squad.length} jugadores)');
+    debugPrint(
+        '🎲 Plantilla inventada para $teamId (${squad.length} jugadores)');
   }
 
   int _parseAge(dynamic age) {
@@ -178,7 +197,11 @@ class ApiService {
 
   double _estimateValue(List<int> stats, int age) {
     final avg = stats.reduce((a, b) => a + b) / stats.length;
-    return avg * avg * 15000;
+    final ageFactor = age <= 28
+        ? 1.0 + (age - 20) * 0.04
+        : 1.0 - (age - 28) * 0.07;
+    return (avg * avg * 15000 * ageFactor.clamp(0.2, 1.6))
+        .clamp(100000, 200000000);
   }
 
   int _ceilingFromStats(List<int> stats, int age) {

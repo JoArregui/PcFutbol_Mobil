@@ -86,6 +86,51 @@ class LeagueService {
     return null;
   }
 
+  /// Simula todos los encuentros de IA de la jornada actual que aún estén pendientes.
+  Future<void> simulateRestOfMatchday(int matchday, int userTeamApiId) async {
+    // 1. Cargamos el mapa de clasificaciones en memoria caché para modificarlo rápidamente
+    await _loadStandingCache();
+
+    // 2. Traemos todos los partidos de la liga para la jornada actual
+    final fixtures = await isar.leagueFixtures
+        .filter()
+        .matchdayEqualTo(matchday)
+        .competitionEqualTo('liga')
+        .findAll();
+
+    final fixturesToUpdate = <LeagueFixture>[];
+
+    for (final f in fixtures) {
+      // Ignoramos los partidos jugados por el usuario o aquellos que ya fueron simulados previamente
+      if (f.homeTeamApiId == userTeamApiId || f.awayTeamApiId == userTeamApiId || f.played) {
+        continue;
+      }
+
+      // 3. Calculamos fuerzas y generamos marcador
+      final hStr = await _teamStrength(f.homeTeamApiId);
+      final aStr = await _teamStrength(f.awayTeamApiId);
+      final (hg, ag) = _simulateScore(hStr, aStr);
+
+      // 4. Actualizamos el objeto de partido
+      f.homeGoals = hg;
+      f.awayGoals = ag;
+      f.played = true;
+
+      fixturesToUpdate.add(f);
+
+      // 5. Impactamos de manera local los puntos y estadísticas en la clasificación mapeada
+      _updateStandingInMemory(f.homeTeamApiId, f.awayTeamApiId, hg, ag);
+    }
+
+    // 6. Guardamos todos los cambios de forma síncrona en una sola transacción Isar
+    if (fixturesToUpdate.isNotEmpty) {
+      await isar.writeTxn(() async {
+        await isar.leagueFixtures.putAll(fixturesToUpdate);
+        await isar.leagueStandings.putAll(_standingCache.values.toList());
+      });
+    }
+  }
+
   Future<List<LeagueStanding>> getStandingsSorted() async {
     final all = await isar.leagueStandings.where().findAll();
     all.sort((a, b) {

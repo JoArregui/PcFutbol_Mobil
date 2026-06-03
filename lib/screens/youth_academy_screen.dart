@@ -62,7 +62,8 @@ class _YouthAcademyScreenState extends State<YouthAcademyScreen> {
                             foregroundColor: Colors.black,
                           ),
                           onPressed: () async {
-                            await _youth.scoutYouth(widget.team.apiId);
+                            // CORRECCIÓN: Se adaptan los parámetros nominales requeridos de scoutYouth
+                            await _youth.scoutYouth(teamApiId: widget.team.apiId, count: 3);
                             await _load();
                           },
                           icon: const Icon(FontAwesomeIcons.binoculars, size: 16),
@@ -97,7 +98,8 @@ class _YouthAcademyScreenState extends State<YouthAcademyScreen> {
                                 ),
                                 trailing: TextButton(
                                   onPressed: () async {
-                                    final msg = await _youth.promoteToFirstTeam(p, widget.team.apiId);
+                                    // CORRECCIÓN: Se elimina el argumento sobrante del team.apiId para coincidir con el servicio
+                                    final msg = await _youth.promoteToFirstTeam(p);
                                     if (!context.mounted) return;
                                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
                                     await _load();

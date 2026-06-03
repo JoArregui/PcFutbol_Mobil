@@ -26,19 +26,43 @@ class _LineupScreenState extends State<LineupScreen> {
   void initState() {
     super.initState();
     _lineup = LineupService(widget.dbService.isar);
-    _load();
+    // IMPORTANTE: Al entrar por primera vez, forceReset es false para que la selección empiece complemente vacía.
+    _load(forceReset: false);
   }
 
-  Future<void> _load() async {
+  int _positionPriority(String pos) {
+    switch (pos.toUpperCase()) {
+      case 'GK': return 1;
+      case 'DEF': return 2;
+      case 'MID': return 3;
+      case 'FWD': return 4;
+      default: return 5;
+    }
+  }
+
+  Future<void> _load({required bool forceReset}) async {
     final squad = await widget.dbService.getPlayersByTeam(widget.userTeam.apiId, professionalsOnly: true);
-    squad.sort((a, b) => b.average.compareTo(a.average));
+    
+    // ORDENACIÓN DOBLE: Posición (GK -> DEF -> MID -> FWD) y Calidad (Mayor a Menor)
+    squad.sort((a, b) {
+      int posCompare = _positionPriority(a.position).compareTo(_positionPriority(b.position));
+      if (posCompare != 0) return posCompare;
+      return b.average.compareTo(a.average);
+    });
+    
     final lineup = await _lineup.getLineup();
+    
     setState(() {
       _squad = squad;
       _formation = lineup.formation;
-      _selected.clear();
-      _selected.addAll(lineup.starterPlayerIds);
       _loading = false;
+      
+      _selected.clear(); 
+      if (forceReset) {
+        // Solo cargamos los IDs si el usuario presiona activamente el botón "AUTO"
+        _selected.addAll(lineup.starterPlayerIds);
+      }
+      // Si forceReset es false, el Set _selected se queda vacío obligando al mánager a elegir.
     });
   }
 
@@ -49,6 +73,7 @@ class _LineupScreenState extends State<LineupScreen> {
       );
       return;
     }
+    
     final gkCount = _squad.where((p) => _selected.contains(p.id) && p.position == 'GK').length;
     if (gkCount < 1) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -56,10 +81,11 @@ class _LineupScreenState extends State<LineupScreen> {
       );
       return;
     }
+    
     await _lineup.saveLineup(_selected.toList(), formation: _formation);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Alineación guardada."), backgroundColor: Color(0xFFDEFF9A)),
+        const SnackBar(content: Text("Alineación guardada con éxito."), backgroundColor: Color(0xFFDEFF9A)),
       );
       Navigator.pop(context);
     }
@@ -70,13 +96,16 @@ class _LineupScreenState extends State<LineupScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF020617),
       appBar: AppBar(
-        title: const Text("ALINEACIÓN", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
+        title: const Text("ALINEACIÓN", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2, color: Colors.white)),
         backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
         actions: [
           TextButton(
             onPressed: () async {
+              // El mánager recurre al segundo entrenador: pick automático e hidratación inmediata del set
               await _lineup.autoPickBest11(widget.userTeam.apiId);
-              await _load();
+              await _load(forceReset: true);
             },
             child: const Text("AUTO", style: TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold)),
           ),
@@ -126,25 +155,38 @@ class _LineupScreenState extends State<LineupScreen> {
                       final p = _squad[i];
                       final on = _selected.contains(p.id);
                       final unavailable = p.injuredDays > 0 || p.suspendedMatches > 0;
+                      
                       return ListTile(
                         onTap: unavailable
                             ? null
                             : () {
-                          setState(() {
-                            if (on) {
-                              _selected.remove(p.id);
-                            } else if (_selected.length < LineupService.requiredStarters) {
-                              _selected.add(p.id);
-                            }
-                          });
-                        },
+                                setState(() {
+                                  if (on) {
+                                    _selected.remove(p.id);
+                                  } else if (_selected.length < LineupService.requiredStarters) {
+                                    _selected.add(p.id);
+                                  }
+                                });
+                              },
                         leading: CircleAvatar(
                           backgroundColor: on ? const Color(0xFFDEFF9A) : const Color(0xFF0F172A),
-                          child: Text(p.position, style: TextStyle(fontSize: 10, color: on ? Colors.black : Colors.white54, fontWeight: FontWeight.bold)),
+                          child: Text(
+                            p.position, 
+                            style: TextStyle(
+                              fontSize: 10, 
+                              color: on ? Colors.black : Colors.white54, 
+                              fontWeight: FontWeight.bold
+                            )
+                          ),
                         ),
                         title: Text(
-                          p.name,
-                          style: TextStyle(color: unavailable ? Colors.white24 : (on ? const Color(0xFFDEFF9A) : Colors.white)),
+                          p.name.toUpperCase(),
+                          style: TextStyle(
+                            color: unavailable 
+                                ? Colors.white24 
+                                : (on ? const Color(0xFFDEFF9A) : Colors.white),
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                         subtitle: unavailable
                             ? Text(
@@ -152,7 +194,10 @@ class _LineupScreenState extends State<LineupScreen> {
                                 style: const TextStyle(color: Colors.redAccent, fontSize: 10),
                               )
                             : null,
-                        trailing: Text(p.average.toStringAsFixed(0), style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)),
+                        trailing: Text(
+                          p.average.toStringAsFixed(0), 
+                          style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.bold)
+                        ),
                       );
                     },
                   ),
@@ -163,6 +208,7 @@ class _LineupScreenState extends State<LineupScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFDEFF9A),
                       minimumSize: const Size(double.infinity, 55),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                     onPressed: _save,
                     child: const Text("GUARDAR ONCE", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),

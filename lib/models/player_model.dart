@@ -25,6 +25,9 @@ class Player {
   late double marketValue;
   late double salary;
 
+  // NUEVO: Cláusula de rescisión para el motor de fichajes
+  late double buyoutClause;
+
   // Personalidad para el motor de negociación
   @enumerated
   late Personality personality;
@@ -69,4 +72,4 @@ class Player {
   }
 }
 
-enum Personality { ambitious, loyal, greedy, professional }  
+enum Personality { ambitious, loyal, greedy, professional }

@@ -281,6 +281,9 @@ class CalendarService {
 
     await TransferAiService(isar).generateMatchdayOffers(userTeamApiId, save.currentMatchday);
 
+    // Se unifica la escritura dentro del único writeTxn padre permitido.
+    // Como 'league.persistStandingsCache()' ya no tiene un writeTxn interno,
+    // se puede ejecutar aquí de forma segura.
     await isar.writeTxn(() async {
       await isar.leagueFixtures.putAll(others);
       await league.persistStandingsCache();

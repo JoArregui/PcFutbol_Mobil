@@ -46,7 +46,11 @@ class BoardService {
       type: MessageType.board,
     );
 
-    if (!ok && _rng.nextDouble() < 0.35) {
+    // Base chance of dismissal if objective not met, reduced by secretary level
+    final double baseDismissalChance = 0.35;
+    final double secretaryReduction = (save.staffSecretaryLevel - 1) * 0.03; // each level reduces 3%
+    final double dismissalChance = (baseDismissalChance - secretaryReduction).clamp(0.05, 0.9);
+    if (!ok && _rng.nextDouble() < dismissalChance) {
       save.financiallyDismissed = true;
       await MessageService(isar).add(
         title: 'No continuarás',

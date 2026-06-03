@@ -30,16 +30,6 @@ class StaffGenerator {
     'Vargas', 'Vázquez', 'Vega', 'Velasco', 'Vicente', 'Vidal', 'Villa', 'Zamora',
   ];
 
-  static const _nickSecretario = [
-    'El Estratega', 'Mano Derecha', 'Del Despacho', 'De los Contratos', 'Del Pizarrón',
-  ];
-  static const _nickPreparador = [
-    'Hierro', 'Del Gimnasio', 'Sin Descanso', 'Del Sprint', 'De la Tabla',
-  ];
-  static const _nickMedico = [
-    'Manos de Santo', 'Del Botiquín', 'Antiroturas', 'Del Masaje', 'De la Recuperación',
-  ];
-
   /// [count] candidatos distintos por rol (por defecto 8).
   static List<StaffMember> generateCandidates(StaffRole role, {int count = 8}) {
     final usedNames = <String>{};
@@ -88,15 +78,7 @@ class StaffGenerator {
     final first = _firstNames[_rng.nextInt(_firstNames.length)];
     final last = _lastNames[_rng.nextInt(_lastNames.length)];
 
-    if (_rng.nextDouble() < 0.35) {
-      final nick = switch (role) {
-        StaffRole.secretario => _nickSecretario,
-        StaffRole.preparador => _nickPreparador,
-        StaffRole.medico => _nickMedico,
-        _ => _nickSecretario,
-      };
-      return '$first "$nick[_rng.nextInt(nick.length)]" $last';
-    }
+    // Eliminados los apodos con comillas por completo.
     if (_rng.nextDouble() < 0.15) {
       return '$first ${_lastNames[_rng.nextInt(_lastNames.length)]}-$last';
     }

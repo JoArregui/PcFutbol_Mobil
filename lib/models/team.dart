@@ -28,16 +28,55 @@ class Team {
 
   factory Team.fromJson(Map<String, dynamic> json) {
     final venue = json['venue']; // A veces viene en la raíz o dentro de 'team'
-    
+    final teamName = json['team']['name'] ?? "Equipo Desconocido";
+    final lowerName = teamName.toLowerCase();
+
+    // Asignamos el presupuesto inicial real basado en la categoría del club
+    int initialBudget = 12500000; // Por defecto modesto
+    if (lowerName.contains('madrid') || lowerName.contains('barcelon') || lowerName.contains('atlético')) {
+      initialBudget = 150000000;
+    } else if (lowerName.contains('valencia') || lowerName.contains('sevilla') || lowerName.contains('betis') || lowerName.contains('real sociedad')) {
+      initialBudget = 45000000;
+    }
+
     return Team(
       apiId: json['team']['id'],
-      name: json['team']['name'] ?? "Equipo Desconocido",
+      name: teamName,
       city: venue != null ? (venue['city'] ?? "Ciudad Desconocida") : "Ciudad Desconocida",
       stadium: venue != null ? (venue['name'] ?? "Estadio Genérico") : "Estadio Genérico",
-      // Capturamos la capacidad de la API, si no existe ponemos 15.000 por defecto
       stadiumCapacity: venue != null ? (venue['capacity'] ?? 15000) : 15000,
       logoUrl: json['team']['logo'] ?? "",
-      budget: 50000000,
+      budget: initialBudget,
     );
+  }
+
+  /// Devuelve el presupuesto formateado con puntos en formato legible (ej: 150.000.000 €)
+  @ignore
+  String get formattedBudget {
+    final RegExp reg = RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))');
+    String mathFunc(Match match) => '${match[1]}.';
+    return '${budget.toString().replaceAllMapped(reg, mathFunc)} €';
+  }
+
+  /// Getters dinámicos para las expectativas de la directiva y metas según el nivel del equipo
+  @ignore
+  Map<String, String> get expectations {
+    final lowerName = name.toLowerCase();
+    if (lowerName.contains('madrid') || lowerName.contains('barcelon') || lowerName.contains('atlético')) {
+      return {
+        "objetivo": "Ganar el campeonato y disputar la final de Copa.",
+        "exigencia": "Crítica. Sin margen de error.",
+      };
+    } else if (lowerName.contains('valencia') || lowerName.contains('sevilla') || lowerName.contains('betis') || lowerName.contains('real sociedad')) {
+      return {
+        "objetivo": "Clasificación para competiciones europeas.",
+        "exigencia": "Alta. La afición demanda regularidad.",
+      };
+    } else {
+      return {
+        "objetivo": "Evitar el descenso y asentar el bloque.",
+        "exigencia": "Media. Desarrollo y estabilidad financiera.",
+      };
+    }
   }
 }

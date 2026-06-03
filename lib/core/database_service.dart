@@ -12,6 +12,7 @@ import '../models/game_message.dart';
 import '../models/cup_fixture.dart';
 import '../models/transfer_offer.dart';
 import '../models/editor_config.dart';
+import '../models/staff.dart'; // <--- NUEVO: Importación del modelo de empleados
 import 'finance_service.dart';
 import 'api_service.dart';
 import 'editor_service.dart';
@@ -43,6 +44,7 @@ class DatabaseService {
           CupFixtureSchema,
           TransferOfferSchema,
           EditorConfigSchema,
+          StaffSchema,
         ],
         directory: dir.path,
       );
@@ -64,7 +66,7 @@ class DatabaseService {
       debugPrint("🚀 Base de datos vacía. Sincronizando con API Sports...");
       try {
         await apiService.syncLeagueTeams(140, this);
-        debugPrint("✅ Equipos sincronizados.");
+        debugPrint("✅ Equipos synchronized.");
       } catch (e) {
         debugPrint("❌ Error en sincronización de equipos: $e");
       }
@@ -80,8 +82,28 @@ class DatabaseService {
       }
     }
     
+    final currentTeams = await getAllTeams();
     final financeService = FinanceService(isar);
-    await financeService.initFinances();
+    
+    // SOLUCIÓN A LOS PARÁMETROS REQUERIDOS:
+    // Si la BD contiene equipos, inicializamos las finanzas con el primero.
+    // Si está completamente vacía (por ejemplo, en el primer arranque), 
+    // creamos un Team ficticio con los argumentos requeridos para que no falle la compilación.
+    if (currentTeams.isNotEmpty) {
+      await financeService.initFinances(currentTeams.first);
+    } else {
+      await financeService.initFinances(
+        Team(
+          apiId: 0,
+          name: "Club por Defecto",
+          city: "Ciudad",
+          stadium: "Estadio Municipal",
+          stadiumCapacity: 10000,
+          logoUrl: "",
+          budget: 5000000,
+        ),
+      );
+    }
 
     final editor = EditorService(isar);
     await editor.getConfig();

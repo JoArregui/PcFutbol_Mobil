@@ -1,10 +1,14 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:isar/isar.dart';
-import 'package:pcfutbol_2026/screens/staff_selection_screen.dart';
 import '../core/database_service.dart';
 import '../core/squad_service.dart';
+import '../core/finance_service.dart';
 import '../models/team.dart';
+import 'main_menu_screen.dart';
+
 
 class TeamSelectionScreen extends StatefulWidget {
   final DatabaseService dbService;
@@ -14,26 +18,84 @@ class TeamSelectionScreen extends StatefulWidget {
   State<TeamSelectionScreen> createState() => _TeamSelectionScreenState();
 }
 
-class _TeamSelectionScreenState extends State<TeamSelectionScreen> {
+class _TeamSelectionScreenState extends State<TeamSelectionScreen>
+    with TickerProviderStateMixin {
   Team? selectedTeam;
   bool _loadingSquad = false;
+
+  // Índice de la tarjeta actualmente girada (-1 = ninguna)
+  int _flippedIndex = -1;
+
+  // Un AnimationController por tarjeta
+  final Map<int, AnimationController> _controllers = {};
+  final Map<int, Animation<double>> _animations = {};
+
+  void _initController(int index) {
+    if (_controllers.containsKey(index)) return;
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    );
+    _controllers[index] = controller;
+    _animations[index] = CurvedAnimation(
+      parent: controller,
+      curve: Curves.easeInOut,
+    );
+  }
+
+  void _flipCard(int index) {
+    _initController(index);
+
+    // Si hay otra girada, la cerramos primero
+    if (_flippedIndex != -1 && _flippedIndex != index) {
+      _controllers[_flippedIndex]?.reverse();
+    }
+
+    if (_flippedIndex == index) {
+      // Ya estaba girada → cerrar
+      _controllers[index]!.reverse();
+      setState(() => _flippedIndex = -1);
+    } else {
+      // Girar esta
+      _controllers[index]!.forward();
+      setState(() => _flippedIndex = index);
+    }
+    HapticFeedback.lightImpact();
+  }
+
+  void _selectTeam(Team team, int index) {
+    // Marcar como seleccionado y volver al frente
+    setState(() => selectedTeam = team);
+    _controllers[index]?.reverse();
+    setState(() => _flippedIndex = -1);
+    HapticFeedback.mediumImpact();
+  }
+
+  @override
+  void dispose() {
+    for (final c in _controllers.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF020617),
       appBar: AppBar(
-        title: Text('ELIGE TU DESTINO',
-            style: GoogleFonts.urbanist(
-              fontWeight: FontWeight.w900,
-              letterSpacing: 2,
-              color: const Color(0xFFDEFF9A),
-            )),
+        title: Text(
+          'ELIGE TU DESTINO',
+          style: GoogleFonts.urbanist(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 2,
+            color: const Color(0xFFDEFF9A),
+          ),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
         centerTitle: true,
         actions: [
-          // Botón de emergencia para forzar reconstrucción
           IconButton(
             icon: const Icon(Icons.refresh, color: Color(0xFFDEFF9A)),
             onPressed: () => setState(() {}),
@@ -41,17 +103,15 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen> {
         ],
       ),
       body: StreamBuilder<List<Team>>(
-        // Añadimos .findAll() al stream para asegurar que la primera carga tenga datos
-        stream: widget.dbService.isar.teams.where().watch(fireImmediately: true),
+        stream: widget.dbService.isar.teams
+            .where()
+            .watchLazy(fireImmediately: true)
+            .asyncMap((_) => widget.dbService.isar.teams.where().findAll()),
         builder: (context, snapshot) {
-          // Si hay datos en el snapshot, los usamos directamente
           final teams = snapshot.data ?? [];
 
-          // Log de depuración interno
           debugPrint("Snapshot State: ${snapshot.connectionState} | Teams: ${teams.length}");
 
-          // Si el stream aún no tiene nada, pero sabemos por el log que la API terminó,
-          // intentamos una lectura directa asíncrona como último recurso.
           if (teams.isEmpty) {
             return FutureBuilder<List<Team>>(
               future: widget.dbService.getAllTeams(),
@@ -73,56 +133,30 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen> {
   Widget _buildTeamList(List<Team> teams) {
     return Column(
       children: [
+        // Subtítulo de instrucción
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4, top: 2),
+          child: Text(
+            "Toca una tarjeta para ver el contrato",
+            style: GoogleFonts.urbanist(
+              color: Colors.white24,
+              fontSize: 12,
+              letterSpacing: 1,
+            ),
+          ),
+        ),
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
             itemCount: teams.length,
             itemBuilder: (context, index) {
+              _initController(index);
               final team = teams[index];
               final isSelected = selectedTeam?.apiId == team.apiId;
 
-              return GestureDetector(
-                onTap: () => setState(() => selectedTeam = team),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFFDEFF9A).withOpacity(0.1)
-                        : Colors.white.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: isSelected ? const Color(0xFFDEFF9A) : Colors.white10,
-                      width: 2,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      _buildLogo(team.logoUrl),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(team.name.toUpperCase(),
-                                style: GoogleFonts.urbanist(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800)),
-                            Text(team.stadium,
-                                style: GoogleFonts.urbanist(
-                                    color: Colors.white38,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500)),
-                          ],
-                        ),
-                      ),
-                      if (isSelected)
-                        const Icon(Icons.check_circle, color: Color(0xFFDEFF9A)),
-                    ],
-                  ),
-                ),
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: _buildFlipCard(team, index, isSelected),
               );
             },
           ),
@@ -132,19 +166,248 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen> {
     );
   }
 
+  Widget _buildFlipCard(Team team, int index, bool isSelected) {
+    _initController(index);
+    final animation = _animations[index]!;
+
+    return GestureDetector(
+      onTap: () => _flipCard(index),
+      child: AnimatedBuilder(
+        animation: animation,
+        builder: (context, _) {
+          final angle = animation.value * pi;
+          final isBack = angle >= pi / 2;
+
+          return Transform(
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.001)
+              ..rotateY(angle),
+            alignment: Alignment.center,
+            child: isBack
+                ? Transform(
+                    transform: Matrix4.identity()..rotateY(pi),
+                    alignment: Alignment.center,
+                    child: _buildCardBack(team, index),
+                  )
+                : _buildCardFront(team, isSelected),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildCardFront(Team team, bool isSelected) {
+    return Container(
+      height: 88,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? const Color(0xFFDEFF9A).withOpacity(0.08)
+            : Colors.white.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isSelected
+              ? const Color(0xFFDEFF9A)
+              : Colors.white.withOpacity(0.08),
+          width: isSelected ? 2 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          _buildLogo(team.logoUrl),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  team.name.toUpperCase(),
+                  style: GoogleFonts.urbanist(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  team.stadium,
+                  style: GoogleFonts.urbanist(
+                    color: Colors.white38,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isSelected)
+            const Icon(Icons.check_circle_rounded,
+                color: Color(0xFFDEFF9A), size: 22)
+          else
+            const Icon(Icons.rotate_right_rounded,
+                color: Colors.white12, size: 18),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCardBack(Team team, int index) {
+    final info = team.expectations;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFDEFF9A).withOpacity(0.4),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Cabecera
+          Row(
+            children: [
+              _buildLogo(team.logoUrl),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      team.name.toUpperCase(),
+                      style: GoogleFonts.urbanist(
+                        color: const Color(0xFFDEFF9A),
+                        fontWeight: FontWeight.w900,
+                        fontSize: 14,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    Text(
+                      "OFERTA DE EMPLEO",
+                      style: GoogleFonts.urbanist(
+                        color: Colors.white38,
+                        fontSize: 10,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Botón de cerrar
+              GestureDetector(
+                onTap: () => _flipCard(index),
+                child: const Icon(Icons.close_rounded,
+                    color: Colors.white24, size: 18),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 12),
+          _buildDivider(),
+          const SizedBox(height: 12),
+
+          // Datos del contrato dinámicos del CMS
+          _buildInfoRow(Icons.account_balance_wallet_outlined,
+              "PRESUPUESTO", team.formattedBudget),
+          const SizedBox(height: 10),
+          _buildInfoRow(
+              Icons.flag_outlined, "OBJETIVO", info["objetivo"]!),
+          const SizedBox(height: 10),
+          _buildInfoRow(Icons.bolt_outlined, "EXIGENCIA", info["exigencia"]!),
+
+          const SizedBox(height: 14),
+          _buildDivider(),
+          const SizedBox(height: 12),
+
+          // Botón elegir
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => _selectTeam(team, index),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFDEFF9A),
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+              ),
+              child: Text(
+                "ELEGIR ESTE CLUB",
+                style: GoogleFonts.urbanist(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: Colors.white24, size: 14),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.urbanist(
+                  color: Colors.white24,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: GoogleFonts.urbanist(
+                  color: Colors.white70,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDivider() {
+    return Container(
+      height: 0.5,
+      color: Colors.white.withOpacity(0.08),
+    );
+  }
+
   Widget _buildLogo(String url) {
     return Container(
-      width: 50,
-      height: 50,
+      width: 44,
+      height: 44,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withOpacity(0.08),
         shape: BoxShape.circle,
       ),
       child: Image.network(
         url,
-        errorBuilder: (context, error, stackTrace) =>
-            const Icon(Icons.shield, color: Colors.white24),
+        errorBuilder: (_, __, ___) =>
+            const Icon(Icons.shield, color: Colors.white24, size: 20),
       ),
     );
   }
@@ -156,8 +419,11 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen> {
         children: [
           const CircularProgressIndicator(color: Color(0xFFDEFF9A)),
           const SizedBox(height: 20),
-          Text("CARGANDO LIGA...",
-              style: GoogleFonts.urbanist(color: Colors.white, letterSpacing: 2)),
+          Text(
+            "CARGANDO LIGA...",
+            style: GoogleFonts.urbanist(
+                color: Colors.white, letterSpacing: 2),
+          ),
         ],
       ),
     );
@@ -165,38 +431,53 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen> {
 
   Widget _buildConfirmButton() {
     return Padding(
-      padding: const EdgeInsets.all(30.0),
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
       child: SizedBox(
         width: double.infinity,
-        height: 60,
+        height: 58,
         child: ElevatedButton(
           onPressed: selectedTeam == null || _loadingSquad
-              ? null
-              : () async {
-                  setState(() => _loadingSquad = true);
-                  await SquadService.fromDatabase(widget.dbService).ensureSquad(selectedTeam!.apiId);
-                  if (!context.mounted) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => StaffSelectionScreen(
-                        userTeam: selectedTeam!,
-                        dbService: widget.dbService,
-                      ),
-                    ),
-                  );
-                  if (mounted) setState(() => _loadingSquad = false);
-                },
+    ? null
+    : () async {
+        setState(() => _loadingSquad = true);
+
+        await SquadService.fromDatabase(widget.dbService)
+            .ensureSquad(selectedTeam!.apiId);
+
+        await FinanceService(widget.dbService.isar)
+            .initFinances(selectedTeam!);
+
+        if (!mounted) return; // ✅ mounted sobre State, no context.mounted
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MainMenuScreen(
+              userTeam: selectedTeam!, // ✅ 'team' en lugar de 'userTeam'
+              dbService: widget.dbService,
+            ),
+          ),
+        );
+
+        if (mounted) setState(() => _loadingSquad = false);
+      },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFDEFF9A),
             foregroundColor: Colors.black,
-            disabledBackgroundColor: Colors.white10,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            disabledBackgroundColor: Colors.white.withOpacity(0.06),
+            disabledForegroundColor: Colors.white24,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18)),
+            elevation: 0,
           ),
           child: Text(
-              _loadingSquad ? 'CARGANDO PLANTILLA…' : 'TOMAR LAS RIENDAS',
-              style: GoogleFonts.urbanist(
-                  fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
+            _loadingSquad ? 'CONTRATANDO PERSONAL…' : 'TOMAR LAS RIENDAS',
+            style: GoogleFonts.urbanist(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.5,
+            ),
+          ),
         ),
       ),
     );

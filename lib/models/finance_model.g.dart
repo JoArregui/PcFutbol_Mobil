@@ -22,68 +22,78 @@ const ClubFinanceSchema = CollectionSchema(
       name: r'balance',
       type: IsarType.double,
     ),
-    r'maxWageBill': PropertySchema(
+    r'loanAmount': PropertySchema(
       id: 1,
+      name: r'loanAmount',
+      type: IsarType.double,
+    ),
+    r'loanWeeks': PropertySchema(
+      id: 2,
+      name: r'loanWeeks',
+      type: IsarType.long,
+    ),
+    r'maxWageBill': PropertySchema(
+      id: 3,
       name: r'maxWageBill',
       type: IsarType.double,
     ),
     r'sponsorIncomePerMatch': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'sponsorIncomePerMatch',
       type: IsarType.double,
     ),
     r'sponsorSlot1Brand': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'sponsorSlot1Brand',
       type: IsarType.string,
     ),
     r'sponsorSlot1Income': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'sponsorSlot1Income',
       type: IsarType.double,
     ),
     r'sponsorSlot2Brand': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'sponsorSlot2Brand',
       type: IsarType.string,
     ),
     r'sponsorSlot2Income': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'sponsorSlot2Income',
       type: IsarType.double,
     ),
     r'sponsorSlot3Brand': PropertySchema(
-      id: 7,
+      id: 9,
       name: r'sponsorSlot3Brand',
       type: IsarType.string,
     ),
     r'sponsorSlot3Income': PropertySchema(
-      id: 8,
+      id: 10,
       name: r'sponsorSlot3Income',
       type: IsarType.double,
     ),
     r'stadiumExtraCapacity': PropertySchema(
-      id: 9,
+      id: 11,
       name: r'stadiumExtraCapacity',
       type: IsarType.long,
     ),
     r'stadiumMaintenance': PropertySchema(
-      id: 10,
+      id: 12,
       name: r'stadiumMaintenance',
       type: IsarType.double,
     ),
     r'ticketPrice': PropertySchema(
-      id: 11,
+      id: 13,
       name: r'ticketPrice',
       type: IsarType.double,
     ),
     r'transferBudget': PropertySchema(
-      id: 12,
+      id: 14,
       name: r'transferBudget',
       type: IsarType.double,
     ),
     r'wageBill': PropertySchema(
-      id: 13,
+      id: 15,
       name: r'wageBill',
       type: IsarType.double,
     )
@@ -121,19 +131,21 @@ void _clubFinanceSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDouble(offsets[0], object.balance);
-  writer.writeDouble(offsets[1], object.maxWageBill);
-  writer.writeDouble(offsets[2], object.sponsorIncomePerMatch);
-  writer.writeString(offsets[3], object.sponsorSlot1Brand);
-  writer.writeDouble(offsets[4], object.sponsorSlot1Income);
-  writer.writeString(offsets[5], object.sponsorSlot2Brand);
-  writer.writeDouble(offsets[6], object.sponsorSlot2Income);
-  writer.writeString(offsets[7], object.sponsorSlot3Brand);
-  writer.writeDouble(offsets[8], object.sponsorSlot3Income);
-  writer.writeLong(offsets[9], object.stadiumExtraCapacity);
-  writer.writeDouble(offsets[10], object.stadiumMaintenance);
-  writer.writeDouble(offsets[11], object.ticketPrice);
-  writer.writeDouble(offsets[12], object.transferBudget);
-  writer.writeDouble(offsets[13], object.wageBill);
+  writer.writeDouble(offsets[1], object.loanAmount);
+  writer.writeLong(offsets[2], object.loanWeeks);
+  writer.writeDouble(offsets[3], object.maxWageBill);
+  writer.writeDouble(offsets[4], object.sponsorIncomePerMatch);
+  writer.writeString(offsets[5], object.sponsorSlot1Brand);
+  writer.writeDouble(offsets[6], object.sponsorSlot1Income);
+  writer.writeString(offsets[7], object.sponsorSlot2Brand);
+  writer.writeDouble(offsets[8], object.sponsorSlot2Income);
+  writer.writeString(offsets[9], object.sponsorSlot3Brand);
+  writer.writeDouble(offsets[10], object.sponsorSlot3Income);
+  writer.writeLong(offsets[11], object.stadiumExtraCapacity);
+  writer.writeDouble(offsets[12], object.stadiumMaintenance);
+  writer.writeDouble(offsets[13], object.ticketPrice);
+  writer.writeDouble(offsets[14], object.transferBudget);
+  writer.writeDouble(offsets[15], object.wageBill);
 }
 
 ClubFinance _clubFinanceDeserialize(
@@ -145,19 +157,21 @@ ClubFinance _clubFinanceDeserialize(
   final object = ClubFinance();
   object.balance = reader.readDouble(offsets[0]);
   object.id = id;
-  object.maxWageBill = reader.readDouble(offsets[1]);
-  object.sponsorIncomePerMatch = reader.readDouble(offsets[2]);
-  object.sponsorSlot1Brand = reader.readString(offsets[3]);
-  object.sponsorSlot1Income = reader.readDouble(offsets[4]);
-  object.sponsorSlot2Brand = reader.readString(offsets[5]);
-  object.sponsorSlot2Income = reader.readDouble(offsets[6]);
-  object.sponsorSlot3Brand = reader.readString(offsets[7]);
-  object.sponsorSlot3Income = reader.readDouble(offsets[8]);
-  object.stadiumExtraCapacity = reader.readLong(offsets[9]);
-  object.stadiumMaintenance = reader.readDouble(offsets[10]);
-  object.ticketPrice = reader.readDouble(offsets[11]);
-  object.transferBudget = reader.readDouble(offsets[12]);
-  object.wageBill = reader.readDouble(offsets[13]);
+  object.loanAmount = reader.readDouble(offsets[1]);
+  object.loanWeeks = reader.readLong(offsets[2]);
+  object.maxWageBill = reader.readDouble(offsets[3]);
+  object.sponsorIncomePerMatch = reader.readDouble(offsets[4]);
+  object.sponsorSlot1Brand = reader.readString(offsets[5]);
+  object.sponsorSlot1Income = reader.readDouble(offsets[6]);
+  object.sponsorSlot2Brand = reader.readString(offsets[7]);
+  object.sponsorSlot2Income = reader.readDouble(offsets[8]);
+  object.sponsorSlot3Brand = reader.readString(offsets[9]);
+  object.sponsorSlot3Income = reader.readDouble(offsets[10]);
+  object.stadiumExtraCapacity = reader.readLong(offsets[11]);
+  object.stadiumMaintenance = reader.readDouble(offsets[12]);
+  object.ticketPrice = reader.readDouble(offsets[13]);
+  object.transferBudget = reader.readDouble(offsets[14]);
+  object.wageBill = reader.readDouble(offsets[15]);
   return object;
 }
 
@@ -173,9 +187,9 @@ P _clubFinanceDeserializeProp<P>(
     case 1:
       return (reader.readDouble(offset)) as P;
     case 2:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 3:
-      return (reader.readString(offset)) as P;
+      return (reader.readDouble(offset)) as P;
     case 4:
       return (reader.readDouble(offset)) as P;
     case 5:
@@ -187,14 +201,18 @@ P _clubFinanceDeserializeProp<P>(
     case 8:
       return (reader.readDouble(offset)) as P;
     case 9:
-      return (reader.readLong(offset)) as P;
+      return (reader.readString(offset)) as P;
     case 10:
       return (reader.readDouble(offset)) as P;
     case 11:
-      return (reader.readDouble(offset)) as P;
+      return (reader.readLong(offset)) as P;
     case 12:
       return (reader.readDouble(offset)) as P;
     case 13:
+      return (reader.readDouble(offset)) as P;
+    case 14:
+      return (reader.readDouble(offset)) as P;
+    case 15:
       return (reader.readDouble(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -402,6 +420,128 @@ extension ClubFinanceQueryFilter
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.between(
         property: r'id',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterFilterCondition>
+      loanAmountEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'loanAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterFilterCondition>
+      loanAmountGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'loanAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterFilterCondition>
+      loanAmountLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'loanAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterFilterCondition>
+      loanAmountBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'loanAmount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterFilterCondition>
+      loanWeeksEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'loanWeeks',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterFilterCondition>
+      loanWeeksGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'loanWeeks',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterFilterCondition>
+      loanWeeksLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'loanWeeks',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterFilterCondition>
+      loanWeeksBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'loanWeeks',
         lower: lower,
         includeLower: includeLower,
         upper: upper,
@@ -1487,6 +1627,30 @@ extension ClubFinanceQuerySortBy
     });
   }
 
+  QueryBuilder<ClubFinance, ClubFinance, QAfterSortBy> sortByLoanAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanAmount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterSortBy> sortByLoanAmountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanAmount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterSortBy> sortByLoanWeeks() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanWeeks', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterSortBy> sortByLoanWeeksDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanWeeks', Sort.desc);
+    });
+  }
+
   QueryBuilder<ClubFinance, ClubFinance, QAfterSortBy> sortByMaxWageBill() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'maxWageBill', Sort.asc);
@@ -1689,6 +1853,30 @@ extension ClubFinanceQuerySortThenBy
     });
   }
 
+  QueryBuilder<ClubFinance, ClubFinance, QAfterSortBy> thenByLoanAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanAmount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterSortBy> thenByLoanAmountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanAmount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterSortBy> thenByLoanWeeks() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanWeeks', Sort.asc);
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QAfterSortBy> thenByLoanWeeksDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanWeeks', Sort.desc);
+    });
+  }
+
   QueryBuilder<ClubFinance, ClubFinance, QAfterSortBy> thenByMaxWageBill() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'maxWageBill', Sort.asc);
@@ -1873,6 +2061,18 @@ extension ClubFinanceQueryWhereDistinct
     });
   }
 
+  QueryBuilder<ClubFinance, ClubFinance, QDistinct> distinctByLoanAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'loanAmount');
+    });
+  }
+
+  QueryBuilder<ClubFinance, ClubFinance, QDistinct> distinctByLoanWeeks() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'loanWeeks');
+    });
+  }
+
   QueryBuilder<ClubFinance, ClubFinance, QDistinct> distinctByMaxWageBill() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'maxWageBill');
@@ -1975,6 +2175,18 @@ extension ClubFinanceQueryProperty
   QueryBuilder<ClubFinance, double, QQueryOperations> balanceProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'balance');
+    });
+  }
+
+  QueryBuilder<ClubFinance, double, QQueryOperations> loanAmountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'loanAmount');
+    });
+  }
+
+  QueryBuilder<ClubFinance, int, QQueryOperations> loanWeeksProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'loanWeeks');
     });
   }
 

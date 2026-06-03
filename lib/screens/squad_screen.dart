@@ -3,7 +3,7 @@ import '../core/squad_service.dart';
 import '../models/player_model.dart';
 import '../models/team.dart';
 import '../core/database_service.dart';
-import 'player_detail_screen.dart'; // <--- IMPORTANTE: Importamos la pantalla de detalle
+import 'player_detail_screen.dart';
 
 class SquadScreen extends StatefulWidget {
   final Team team;
@@ -16,7 +16,6 @@ class SquadScreen extends StatefulWidget {
 }
 
 class _SquadScreenState extends State<SquadScreen> {
-  // CAMBIO 1: Eliminamos 'late' e inicializamos con un Future nulo
   Future<List<Player>>? _squadFuture;
 
   @override
@@ -57,7 +56,7 @@ class _SquadScreenState extends State<SquadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF020617), // Aseguramos el fondo oscuro coherente
+      backgroundColor: const Color(0xFF020617),
       appBar: AppBar(
         title: Text(widget.team.name.toUpperCase(), 
           style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
@@ -75,7 +74,6 @@ class _SquadScreenState extends State<SquadScreen> {
           ),
         ],
       ),
-      // CAMBIO 2: Manejamos el estado inicial nulo del Future
       body: _squadFuture == null 
         ? const Center(child: CircularProgressIndicator(color: Color(0xFFDEFF9A)))
         : FutureBuilder<List<Player>>(
@@ -94,7 +92,17 @@ class _SquadScreenState extends State<SquadScreen> {
                 );
               }
 
-              players.sort((a, b) => _positionPriority(a.position).compareTo(_positionPriority(b.position)));
+              // SECCIÓN CRÍTICA DE ORDENACIÓN DOBLE: 
+              // 1º Criterio: Posición (GK -> DEF -> MID -> FWD)
+              // 2º Criterio: Calidad / Media (De mayor a menor)
+              players.sort((a, b) {
+                int posCompare = _positionPriority(a.position).compareTo(_positionPriority(b.position));
+                if (posCompare != 0) {
+                  return posCompare; 
+                }
+                // Si la posición es igual, desempatamos comparando las medias al revés (b vs a) para orden descendente
+                return b.average.compareTo(a.average);
+              });
 
               return Column(
                 children: [
@@ -122,64 +130,66 @@ class _SquadScreenState extends State<SquadScreen> {
     );
   }
 
- Widget _buildTeamHeader(List<Player> players) {
-  if (players.isEmpty) return const SizedBox();
-  double avg = players.map((p) => p.average).reduce((a, b) => a + b) / players.length;
+  Widget _buildTeamHeader(List<Player> players) {
+    if (players.isEmpty) return const SizedBox();
+    double avg = players.map((p) => p.average).reduce((a, b) => a + b) / players.length;
 
-  return Container(
-    margin: const EdgeInsets.all(20),
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: const Color(0xFF1e293b),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: const Color(0xFFDEFF9A).withOpacity(0.3)),
-    ),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween, 
-      children: [
-        Image.network(
-          widget.team.logoUrl, 
-          height: 50, 
-          errorBuilder: (_, __, ___) => const Icon(Icons.shield, size: 40, color: Colors.white24)
-        ),
-        
-        const SizedBox(width: 15),
+    return Container(
+      margin: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFDEFF9A).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween, 
+        children: [
+          Image.network(
+            widget.team.logoUrl, 
+            height: 50, 
+            errorBuilder: (_, __, ___) => const Icon(Icons.shield, size: 40, color: Colors.white24)
+          ),
+          
+          const SizedBox(width: 15),
 
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("MEDIA", 
+                  style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
+                Text(avg.toStringAsFixed(1), 
+                  style: const TextStyle(
+                    color: Color(0xFFDEFF9A), 
+                    fontSize: 28, 
+                    fontWeight: FontWeight.bold
+                  )),
+              ],
+            ),
+          ),
+
+          const Spacer(),
+
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("MEDIA", 
+              const Text("JUG.", 
                 style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
-              Text(avg.toStringAsFixed(1), 
-                style: const TextStyle(
-                  color: Color(0xFFDEFF9A), 
-                  fontSize: 28, 
-                  fontWeight: FontWeight.bold
-                )),
+              Text("${players.length}", 
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
             ],
-          ),
-        ),
-
-        const Spacer(),
-
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("JUG.", 
-              style: TextStyle(color: Colors.white54, fontSize: 10, letterSpacing: 1)),
-            Text("${players.length}", 
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-          ],
-        )
-      ],
-    ),
-  );
-}
+          )
+        ],
+      ),
+    );
+  }
 
   Widget _buildPlayerRow(BuildContext context, Player player) {
+    final positionColor = _getPositionColor(player.position);
+
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -198,7 +208,7 @@ class _SquadScreenState extends State<SquadScreen> {
         margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.03),
+          color: Colors.white.withValues(alpha: 0.03),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -207,13 +217,13 @@ class _SquadScreenState extends State<SquadScreen> {
               width: 35,
               padding: const EdgeInsets.symmetric(vertical: 4),
               decoration: BoxDecoration(
-                color: _getPositionColor(player.position).withOpacity(0.2),
+                color: positionColor.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: _getPositionColor(player.position).withOpacity(0.5)),
+                border: Border.all(color: positionColor.withValues(alpha: 0.5)),
               ),
               child: Text(player.position, 
                 textAlign: TextAlign.center,
-                style: TextStyle(color: _getPositionColor(player.position), fontWeight: FontWeight.bold, fontSize: 10)),
+                style: TextStyle(color: positionColor, fontWeight: FontWeight.bold, fontSize: 10)),
             ),
             const SizedBox(width: 15),
             Expanded(

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/calendar_service.dart';
 import '../core/database_service.dart';
 import '../core/game_session_service.dart';
@@ -45,6 +46,7 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
   bool _matchStarted = false;
   bool _matchFinished = false;
   bool _loadingSquad = true;
+  bool _isPaused = false;
   String _userFormation = '4-4-2';
   double _medicoLevel = 1;
   String _matchMode = 'resumen';
@@ -92,34 +94,42 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
     if (homePlayers.isEmpty) homePlayers = _placeholderSquad();
     if (awayPlayers.isEmpty) awayPlayers = _placeholderSquad();
 
+    final homeFormation = _home.apiId == widget.userTeam.apiId ? _userFormation : '4-4-2';
+    final awayFormation = _away.apiId == widget.userTeam.apiId ? _userFormation : '4-3-3';
+
     final timeline = _engine.simulateMatch(
       home: _home,
       away: _away,
       homePlayers: homePlayers,
       awayPlayers: awayPlayers,
-      homeFormation: _home.apiId == widget.userTeam.apiId ? _userFormation : '4-4-2',
-      awayFormation: _away.apiId == widget.userTeam.apiId ? _userFormation : '4-3-3',
+      homeFormation: homeFormation,
+      awayFormation: awayFormation,
       medicoLevel: _medicoLevel,
     );
     _fullTimeline.addAll(timeline);
+
     final last = timeline.lastWhere((e) => e.isFullTime, orElse: () => timeline.last);
     _homeScore = last.homeScore ?? 0;
     _awayScore = last.awayScore ?? 0;
 
     if (!mounted) return;
+
     setState(() {
       _loadingSquad = false;
       if (_matchMode == 'resultado') {
         _matchStarted = true;
         _matchFinished = false;
       } else {
+        _homeScore = 0;
+        _awayScore = 0;
+
         _matchStream = _engine.playMatch(
           home: _home,
           away: _away,
           homePlayers: homePlayers,
           awayPlayers: awayPlayers,
-          homeFormation: _home.apiId == widget.userTeam.apiId ? _userFormation : '4-4-2',
-          awayFormation: '4-3-3',
+          homeFormation: homeFormation,
+          awayFormation: awayFormation,
           medicoLevel: _medicoLevel,
         );
       }
@@ -155,6 +165,7 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
 
     setState(() {
       _matchStarted = true;
+      _isPaused = false;
       _history.clear();
       _homeScore = 0;
       _awayScore = 0;
@@ -175,6 +186,71 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
             isFullTime: true,
           ));
         }
+      },
+    );
+  }
+
+  void _togglePause() {
+    if (_matchFinished) return;
+    setState(() {
+      _isPaused = !_isPaused;
+      if (_isPaused) {
+        _subscription?.pause();
+      } else {
+        _subscription?.resume();
+      }
+    });
+  }
+
+  void _openSubstitutionMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          height: 300,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(FontAwesomeIcons.userGroup, color: Color(0xFFDEFF9A), size: 18),
+                  SizedBox(width: 12),
+                  Text(
+                    "ÁREA TÉCNICA / CAMBIOS",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
+              ),
+              const Divider(color: Colors.white10, height: 24),
+              const Expanded(
+                child: Center(
+                  child: Text(
+                    "Aquí se gestionará la alineación y los jugadores suplentes disponibles.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white38, fontSize: 13),
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDEFF9A),
+                  minimumSize: const Size(double.infinity, 48),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _togglePause();
+                },
+                child: const Text("REANUDAR PARTIDO", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+              ),
+            ],
+          ),
+        );
       },
     );
   }
@@ -277,34 +353,74 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          if (_matchStarted && !_matchFinished && _matchMode != 'resultado')
+            IconButton(
+              icon: Icon(
+                _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+                color: const Color(0xFFDEFF9A),
+                size: 28,
+              ),
+              onPressed: _togglePause,
+            ),
+        ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          _buildScoreboard(),
-          if (_loadingSquad)
-            const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: Color(0xFFDEFF9A)))
-          else if (!_matchStarted && _matchMode != 'resultado')
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  Text(
-                    'Formación: $_userFormation',
-                    style: const TextStyle(color: Colors.white38, fontSize: 11),
+          Column(
+            children: [
+              _buildScoreboard(),
+              if (_loadingSquad)
+                const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: Color(0xFFDEFF9A)))
+              else if (!_matchStarted && _matchMode != 'resultado')
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Formación: $_userFormation',
+                        style: const TextStyle(color: Colors.white38, fontSize: 11),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDEFF9A),
+                          minimumSize: const Size(double.infinity, 52),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _matchStream == null ? null : _startMatch,
+                        icon: const Icon(Icons.play_arrow_rounded, color: Colors.black),
+                        label: const Text("¡A JUGAR! (RESUMEN)", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFDEFF9A),
-                      minimumSize: const Size(double.infinity, 52),
-                    ),
-                    onPressed: _matchStream == null ? null : _startMatch,
-                    child: const Text("¡A JUGAR! (RESUMEN)", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+                ),
+              Expanded(child: _matchStarted ? _buildTicker() : _buildPreMatch()),
+            ],
+          ),
+          if (_matchStarted && !_matchFinished && _isPaused)
+            Positioned(
+              bottom: 24,
+              left: 20,
+              right: 20,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 200),
+                opacity: _isPaused ? 1.0 : 0.0,
+                child: FloatingActionButton.extended(
+                  backgroundColor: const Color(0xFF1E293B),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: const BorderSide(color: Color(0xFFDEFF9A), width: 1),
                   ),
-                ],
+                  onPressed: _openSubstitutionMenu,
+                  icon: const Icon(FontAwesomeIcons.userGear, size: 16, color: Color(0xFFDEFF9A)),
+                  label: const Text(
+                    "REALIZAR CAMBIOS / TÁCTICA",
+                    style: TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  ),
+                ),
               ),
             ),
-          Expanded(child: _matchStarted ? _buildTicker() : _buildPreMatch()),
         ],
       ),
     );
@@ -345,9 +461,23 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
       ),
       child: Column(
         children: [
-          Text(
-            _matchStarted ? "$_currentMinute'" : "PREVIA",
-            style: const TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold, fontSize: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (_isPaused && !_matchFinished)
+                const Padding(
+                  padding: EdgeInsets.only(right: 8),
+                  child: Icon(Icons.pause_circle_filled_rounded, color: Colors.amber, size: 16),
+                ),
+              Text(
+                _matchStarted ? "$_currentMinute'" : "PREVIA",
+                style: TextStyle(
+                  color: _isPaused ? Colors.amber : const Color(0xFFDEFF9A),
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Row(
@@ -395,7 +525,7 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.only(left: 14, right: 14, top: 14, bottom: _isPaused ? 85 : 14),
       itemCount: _history.length,
       itemBuilder: (_, i) {
         final e = _history[i];
@@ -416,13 +546,13 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
             color: isGoal
                 ? const Color(0xFFDEFF9A).withValues(alpha: 0.1)
                 : isBreak
-                    ? const Color(0xFF1e293b)
+                    ? const Color(0xFF1E293B)
                     : Colors.white.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: border ?? Colors.transparent),
           ),
           child: Text(
-            "${e.minute}'  ${e.description}",
+            "${e.minute}'   ${e.description}",
             style: TextStyle(
               color: isGoal || isCard || isInjury ? const Color(0xFFDEFF9A) : Colors.white70,
               fontWeight: isGoal || isBreak ? FontWeight.bold : FontWeight.normal,

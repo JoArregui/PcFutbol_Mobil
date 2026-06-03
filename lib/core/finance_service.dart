@@ -2,31 +2,42 @@ import 'package:isar/isar.dart';
 import '../models/player_model.dart';
 import '../models/finance_model.dart';
 import '../models/game_save.dart';
+import '../models/team.dart';
 
 class FinanceService {
   final Isar isar;
   FinanceService(this.isar);
 
-  Future<void> initFinances() async {
-    if (await isar.clubFinances.count() == 0) {
-      await isar.writeTxn(() async {
-        await isar.clubFinances.put(ClubFinance()
-          ..id = 1
-          ..balance = 50000000.0
-          ..transferBudget = 25000000.0
-          ..wageBill = 12000000.0
-          ..maxWageBill = 35000000.0
-          ..ticketPrice = 25.0
-          ..stadiumMaintenance = 45000.0
-          ..sponsorIncomePerMatch = 0
-          ..sponsorSlot1Brand = ""
-          ..sponsorSlot1Income = 0
-          ..sponsorSlot2Brand = ""
-          ..sponsorSlot2Income = 0
-          ..sponsorSlot3Brand = ""
-          ..sponsorSlot3Income = 0);
-      });
-    }
+  /// Inicializa las finanzas de la partida basándose en el equipo elegido por el usuario
+  Future<void> initFinances(Team userTeam) async {
+    final double initialBalance = userTeam.budget.toDouble();
+    final double initialTransfer = initialBalance * 0.5; // 50% para fichajes
+    final double initialWageBill = initialBalance * 0.25; // 25% comprometido en fichas anuales
+    final double maxWageBillAllowed = initialBalance * 0.70; // Límite de control financiero
+
+    // Mantenimiento de estadio basado en su capacidad real (ej: 1.2€ por asiento al año)
+    final double maintenance = userTeam.stadiumCapacity * 1.2;
+
+    await isar.writeTxn(() async {
+      await isar.clubFinances.put(ClubFinance()
+        ..id = 1
+        ..balance = initialBalance
+        ..transferBudget = initialTransfer
+        ..wageBill = initialWageBill
+        ..maxWageBill = maxWageBillAllowed
+        ..ticketPrice = 25.0
+        ..stadiumMaintenance = maintenance
+        ..sponsorIncomePerMatch = 45000.0 // Base fija de vallas publicitarias iniciales
+        ..sponsorSlot1Brand = "Patrocinador Principal"
+        ..sponsorSlot1Income = 120000.0
+        ..sponsorSlot2Brand = "Valla Lateral"
+        ..sponsorSlot2Income = 45000.0
+        ..sponsorSlot3Brand = "Marcador Electrónico"
+        ..sponsorSlot3Income = 60000.0
+        ..stadiumExtraCapacity = 0
+        ..loanAmount = 0.0
+        ..loanWeeks = 0);
+    });
   }
 
   Future<String> signPlayer(Player targetPlayer, double agreedPrice, int userTeamApiId) async {
@@ -85,7 +96,7 @@ class FinanceService {
     return "Vendido por ${(salePrice / 1e6).toStringAsFixed(2)} M€.";
   }
 
-  /// Nóminas del cuerpo técnico por jornada (estilo gestión PCF7).
+  /// Nóminas del cuerpo técnico por jornada (estilo gestión PCF7) y amortización de créditos.
   Future<void> deductStaffAndWages(GameSave save) async {
     final finance = await isar.clubFinances.get(1);
     if (finance == null) return;
@@ -96,7 +107,26 @@ class FinanceService {
         12000.0;
     final weeklyWages = finance.wageBill / 38;
 
-    finance.balance -= staffCost + weeklyWages;
+    // Calcular pago semanal de amortización si el club tiene deuda con el banco
+    double weeklyLoanPayment = 0.0;
+    if (finance.loanAmount > 0 && finance.loanWeeks > 0) {
+      const double annualInterestRate = 0.10;
+      double totalInterest = finance.loanAmount * (annualInterestRate * (finance.loanWeeks / 52));
+      weeklyLoanPayment = (finance.loanAmount + totalInterest) / finance.loanWeeks;
+
+      // Decrementar amortización en la base de datos
+      finance.loanWeeks--;
+      if (finance.loanWeeks <= 0) {
+        finance.loanAmount = 0.0; // Préstamo totalmente pagado
+        finance.loanWeeks = 0;
+      } else {
+        // Reducimos proporcionalmente el capital principal adeudado
+        finance.loanAmount -= (finance.loanAmount / (finance.loanWeeks + 1));
+      }
+    }
+
+    // Aplicar todos los gastos operativos del club al balance total
+    finance.balance -= (staffCost + weeklyWages + weeklyLoanPayment);
     if (finance.balance < 0) {
       finance.balance = 0;
     }
