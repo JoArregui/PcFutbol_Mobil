@@ -8,6 +8,9 @@ class UserLineup {
 
   List<int> starterPlayerIds = [];
 
+  /// 7 suplentes convocados para cambios durante el partido.
+  List<int> benchPlayerIds = [];
+
   /// Formación táctica estilo PC Fútbol: 4-4-2, 4-3-3, 3-5-2, 5-3-2
   String formation = '4-4-2';
 }

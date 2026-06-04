@@ -1,6 +1,5 @@
 import 'package:isar/isar.dart';
 import '../models/game_save.dart';
-import '../models/finance_model.dart';
 import '../models/game_message.dart';
 import 'message_service.dart';
 

@@ -72,6 +72,14 @@ class PlayerGenerator {
     return out;
   }
 
+  // ── Generación de un jugador específico ───────────────────────────────────
+  static Player generateSpecificPosition(int teamApiId, String position, int seasonNumber) {
+    final p = _buildPlayer(teamApiId, youthBet: false);
+    p.position = position;
+    p.stats = _statsForPosition(position, 70); // Base media adecuada para inicio
+    return p;
+  }
+
   // ── Constructor interno ───────────────────────────────────────────────────
 
   static Player _buildPlayer(

@@ -12,7 +12,7 @@ import '../models/game_message.dart';
 import '../models/cup_fixture.dart';
 import '../models/transfer_offer.dart';
 import '../models/editor_config.dart';
-import '../models/staff.dart'; // <--- NUEVO: Importación del modelo de empleados
+import '../models/staff.dart'; // 
 import 'finance_service.dart';
 import 'api_service.dart';
 import 'editor_service.dart';

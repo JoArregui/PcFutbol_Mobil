@@ -8,6 +8,8 @@ class LineupService {
   LineupService(this.isar);
 
   static const int requiredStarters = 11;
+  static const int requiredBench = 7;
+  static const int requiredMatchdaySquad = requiredStarters + requiredBench;
 
   Future<UserLineup> getLineup() async {
     var lineup = await isar.userLineups.get(1);
@@ -15,14 +17,12 @@ class LineupService {
     return lineup;
   }
 
-  Future<List<Player>> getStarters(int teamApiId) async {
-    final lineup = await getLineup();
-    if (lineup.starterPlayerIds.length < requiredStarters) return [];
-
+  Future<List<Player>> _resolvePlayers(List<int> ids, int teamApiId) async {
     final players = <Player>[];
-    for (final pid in lineup.starterPlayerIds) {
+    for (final pid in ids) {
       final p = await isar.players.get(pid);
       if (p != null &&
+          p.teamApiId == teamApiId &&
           p.injuredDays <= 0 &&
           p.suspendedMatches <= 0 &&
           !p.isYouth) {
@@ -30,6 +30,20 @@ class LineupService {
       }
     }
     return players;
+  }
+
+  Future<List<Player>> getStarters(int teamApiId) async {
+    final lineup = await getLineup();
+    if (lineup.starterPlayerIds.length < requiredStarters) return [];
+    final players = await _resolvePlayers(lineup.starterPlayerIds, teamApiId);
+    return players.length == requiredStarters ? players : [];
+  }
+
+  Future<List<Player>> getBench(int teamApiId) async {
+    final lineup = await getLineup();
+    if (lineup.benchPlayerIds.length < requiredBench) return [];
+    final players = await _resolvePlayers(lineup.benchPlayerIds, teamApiId);
+    return players.length == requiredBench ? players : [];
   }
 
   Future<String> getFormation() async {
@@ -44,28 +58,43 @@ class LineupService {
   }
 
   Future<bool> hasValidLineup(int teamApiId) async {
+    final lineup = await getLineup();
+    if (lineup.starterPlayerIds.length != requiredStarters) return false;
+    if (lineup.benchPlayerIds.length != requiredBench) return false;
+
+    final allIds = {...lineup.starterPlayerIds, ...lineup.benchPlayerIds};
+    if (allIds.length != requiredMatchdaySquad) return false;
+
     final starters = await getStarters(teamApiId);
     if (starters.length != requiredStarters) return false;
-    return starters.any((p) => p.position == 'GK');
+    if (!starters.any((p) => p.position == 'GK')) return false;
+
+    final bench = await getBench(teamApiId);
+    return bench.length == requiredBench;
   }
 
-  Future<void> saveLineup(List<int> playerIds, {String? formation}) async {
+  Future<void> saveLineup({
+    required List<int> starterIds,
+    required List<int> benchIds,
+    String? formation,
+  }) async {
     final current = await getLineup();
     final lineup = UserLineup()
       ..id = 1
-      ..starterPlayerIds = playerIds
+      ..starterPlayerIds = starterIds
+      ..benchPlayerIds = benchIds
       ..formation = formation ?? current.formation;
     await isar.writeTxn(() => isar.userLineups.put(lineup));
   }
 
-  /// Mejor 11 automático al estilo PCF7 (1 portero + mejores por línea).
-  Future<void> autoPickBest11(int teamApiId) async {
+  /// Mejor 11 + 7 suplentes automáticos.
+  Future<void> autoPickMatchdaySquad(int teamApiId) async {
     final all = await isar.players
         .filter()
         .teamApiIdEqualTo(teamApiId)
         .isYouthEqualTo(false)
         .findAll();
-    if (all.length < requiredStarters) return;
+    if (all.length < requiredMatchdaySquad) return;
 
     all.sort((a, b) => b.average.compareTo(a.average));
 
@@ -89,6 +118,20 @@ class LineupService {
       }
     }
 
-    await saveLineup(picked.take(requiredStarters).map((p) => p.id).toList());
+    final bench = <Player>[];
+    for (final p in all) {
+      if (bench.length >= requiredBench) break;
+      if (!used.contains(p.id)) {
+        bench.add(p);
+        used.add(p.id);
+      }
+    }
+
+    if (picked.length < requiredStarters || bench.length < requiredBench) return;
+
+    await saveLineup(
+      starterIds: picked.map((p) => p.id).toList(),
+      benchIds: bench.map((p) => p.id).toList(),
+    );
   }
 }

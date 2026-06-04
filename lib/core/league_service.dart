@@ -4,7 +4,6 @@ import '../models/league_fixture.dart';
 import '../models/league_standing.dart';
 import '../models/team.dart';
 import '../models/finance_model.dart';
-import '../models/player_model.dart';
 
 class LeagueService {
   final Isar isar;
@@ -173,18 +172,29 @@ class LeagueService {
     return _simulateScore(hStr, aStr);
   }
 
-  Future<void> applyMatchFinancePublic(ClubFinance finance, Team userTeam) async {
-    await _applyMatchFinance(finance, userTeam);
+  Future<void> applyMatchFinancePublic(
+    ClubFinance finance,
+    Team userTeam, {
+    required bool userPlayedAtHome,
+  }) async {
+    await _applyMatchFinance(finance, userTeam, userPlayedAtHome: userPlayedAtHome);
   }
 
-  Future<void> _applyMatchFinance(ClubFinance finance, Team userTeam) async {
-    final attendance = (await _estimateAttendance(userTeam, finance.ticketPrice)).round();
-    final ticketIncome = attendance * finance.ticketPrice;
+  Future<void> _applyMatchFinance(
+    ClubFinance finance,
+    Team userTeam, {
+    required bool userPlayedAtHome,
+  }) async {
+    final ticketIncome = userPlayedAtHome
+        ? (await _estimateAttendance(userTeam, finance.ticketPrice)).round() *
+            finance.ticketPrice
+        : 0.0;
     final sponsors = finance.sponsorSlot1Income +
         finance.sponsorSlot2Income +
         finance.sponsorSlot3Income;
     finance.sponsorIncomePerMatch = sponsors;
-    final matchIncome = ticketIncome + sponsors - finance.stadiumMaintenance;
+    final maintenance = userPlayedAtHome ? finance.stadiumMaintenance : 0.0;
+    final matchIncome = ticketIncome + sponsors - maintenance;
     finance.balance += matchIncome;
     finance.transferBudget += matchIncome * 0.12;
   }

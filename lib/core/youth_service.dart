@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:isar/isar.dart';
 import '../models/player_model.dart';
-import '../models/team.dart';
 
 class YouthService {
   final Isar isar;

@@ -3,8 +3,9 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/database_service.dart';
 import '../core/staff_service.dart';
 import '../models/staff.dart';
-import '../models/finance_model.dart';
+import '../models/staff_member.dart';
 import '../models/team.dart';
+import '../core/staff_generator.dart';
 
 class StaffScreen extends StatefulWidget {
   final DatabaseService dbService;
@@ -24,13 +25,24 @@ class _StaffScreenState extends State<StaffScreen> {
   double _currentBudget = 0;
 
   final List<Map<String, dynamic>> _availableRoles = [
-    {'id': 'coach', 'label': 'Secretario Técnico', 'icon': FontAwesomeIcons.userTie},
-    {'id': 'assistant', 'label': 'Preparador Físico', 'icon': FontAwesomeIcons.users},
-    {'id': 'physio', 'label': 'Médico', 'icon': FontAwesomeIcons.heartPulse},
-    {'id': 'psychologist', 'label': 'Psicólogo Deportivo', 'icon': FontAwesomeIcons.brain},
-    {'id': 'scout', 'label': 'Ojeador Jefe', 'icon': FontAwesomeIcons.eye},
-    {'id': 'youth_director', 'label': 'Director de Cantera', 'icon': FontAwesomeIcons.graduationCap},
+    {'id': 'coach',          'label': 'Secretario Técnico',   'icon': FontAwesomeIcons.userTie},
+    {'id': 'assistant',      'label': 'Preparador Físico',    'icon': FontAwesomeIcons.users},
+    {'id': 'physio',         'label': 'Médico',               'icon': FontAwesomeIcons.heartPulse},
+    {'id': 'psychologist',   'label': 'Psicólogo Deportivo',  'icon': FontAwesomeIcons.brain},
+    {'id': 'scout',          'label': 'Ojeador Jefe',         'icon': FontAwesomeIcons.eye},
+    {'id': 'youth_director', 'label': 'Director de Cantera',  'icon': FontAwesomeIcons.graduationCap},
   ];
+
+  StaffRole _toStaffRole(String roleId) {
+    switch (roleId) {
+      case 'coach':          return StaffRole.secretario;
+      case 'assistant':      return StaffRole.preparador;
+      case 'physio':         return StaffRole.medico;
+      case 'psychologist':   return StaffRole.psicologo;
+      case 'youth_director': return StaffRole.juvenil;
+      default:               return StaffRole.secretario;
+    }
+  }
 
   @override
   void initState() {
@@ -60,11 +72,13 @@ class _StaffScreenState extends State<StaffScreen> {
 
   String _getRoleDisplay(String role) {
     final found = _availableRoles.firstWhere(
-      (element) => element['id'] == role,
+      (e) => e['id'] == role,
       orElse: () => {},
     );
     return found.isNotEmpty ? found['label'] : 'Staff';
   }
+
+  // ─── Pantalla principal ───────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -82,88 +96,25 @@ class _StaffScreenState extends State<StaffScreen> {
           ? const Center(child: CircularProgressIndicator(color: Color(0xFFDEFF9A)))
           : Column(
               children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0F172A),
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.white10),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'COSTO MENSUAL TOTAL',
-                              style: TextStyle(
-                                color: Colors.white38,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '\$${(_totalMonthlyCost / 1000).toStringAsFixed(0)}k / mes',
-                              style: const TextStyle(
-                                color: Color(0xFFDEFF9A),
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            const Text(
-                              'PRESUPUESTO CLUB',
-                              style: TextStyle(
-                                color: Colors.white38,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '\$${(_currentBudget / 1000).toStringAsFixed(0)}k',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+                _buildBudgetBar(),
                 Expanded(
                   child: ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: _availableRoles.length,
                     itemBuilder: (context, index) {
-                      final roleMap = _availableRoles[index];
-                      final String roleId = roleMap['id'];
+                      final roleMap    = _availableRoles[index];
+                      final String roleId    = roleMap['id'];
                       final String roleLabel = roleMap['label'];
                       final IconData roleIcon = roleMap['icon'];
 
-                      final Staff? assignedStaff = _staff.cast<Staff?>().firstWhere(
+                      final Staff? assigned = _staff.cast<Staff?>().firstWhere(
                         (s) => s?.role == roleId,
                         orElse: () => null,
                       );
 
-                      if (assignedStaff != null) {
-                        return _buildOccupiedSlot(assignedStaff, roleIcon);
-                      } else {
-                        return _buildEmptySlot(roleId, roleLabel, roleIcon);
-                      }
+                      return assigned != null
+                          ? _buildOccupiedSlot(assigned, roleIcon)
+                          : _buildEmptySlot(roleId, roleLabel, roleIcon);
                     },
                   ),
                 ),
@@ -172,13 +123,64 @@ class _StaffScreenState extends State<StaffScreen> {
     );
   }
 
+  // ─── Barra de presupuesto ─────────────────────────────────────────────────
+
+  Widget _buildBudgetBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(15),
+          border: Border.all(color: Colors.white10),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('COSTO MENSUAL TOTAL',
+                    style: TextStyle(color: Colors.white38, fontSize: 10,
+                        fontWeight: FontWeight.bold, letterSpacing: 1)),
+                const SizedBox(height: 4),
+                Text(
+                  '\$${(_totalMonthlyCost / 1000).toStringAsFixed(0)}k / mes',
+                  style: const TextStyle(color: Color(0xFFDEFF9A),
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text('PRESUPUESTO CLUB',
+                    style: TextStyle(color: Colors.white38, fontSize: 10,
+                        fontWeight: FontWeight.bold, letterSpacing: 1)),
+                const SizedBox(height: 4),
+                Text(
+                  '\$${(_currentBudget / 1000).toStringAsFixed(0)}k',
+                  style: const TextStyle(color: Colors.white,
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Slot ocupado ─────────────────────────────────────────────────────────
+
   Widget _buildOccupiedSlot(Staff staff, IconData icon) {
     return Card(
       color: const Color(0xFF0F172A),
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
-        side: BorderSide(color: const Color(0xFFDEFF9A).withOpacity(0.3)), // ✅ 'side' en lugar de 'border'
+        side: BorderSide(color: const Color(0xFFDEFF9A).withOpacity(0.3)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -199,22 +201,13 @@ class _StaffScreenState extends State<StaffScreen> {
                 children: [
                   Text(
                     _getRoleDisplay(staff.role).toUpperCase(),
-                    style: const TextStyle(
-                      color: Color(0xFFDEFF9A),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w900, // ✅ Corregido: w900 en lugar de black
-                      letterSpacing: 1,
-                    ),
+                    style: const TextStyle(color: Color(0xFFDEFF9A), fontSize: 9,
+                        fontWeight: FontWeight.w900, letterSpacing: 1),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    staff.name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                    ),
-                  ),
+                  Text(staff.name,
+                      style: const TextStyle(color: Colors.white,
+                          fontWeight: FontWeight.bold, fontSize: 15)),
                   const SizedBox(height: 4),
                   Text(
                     '${'⭐' * staff.level}   ·   \$${(staff.salary / 1000).toStringAsFixed(0)}k/mes',
@@ -227,13 +220,15 @@ class _StaffScreenState extends State<StaffScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
-                  tooltip: 'Entrenar Empleado',
-                  icon: const Icon(FontAwesomeIcons.chartLine, color: Color(0xFFDEFF9A), size: 18),
+                  tooltip: 'Mejorar nivel',
+                  icon: const Icon(FontAwesomeIcons.chartLine,
+                      color: Color(0xFFDEFF9A), size: 18),
                   onPressed: () => _trainStaff(staff),
                 ),
                 IconButton(
                   tooltip: 'Despedir',
-                  icon: const Icon(FontAwesomeIcons.trashCan, color: Colors.redAccent, size: 18),
+                  icon: const Icon(FontAwesomeIcons.trashCan,
+                      color: Colors.redAccent, size: 18),
                   onPressed: () => _fireStaff(staff),
                 ),
               ],
@@ -244,13 +239,15 @@ class _StaffScreenState extends State<StaffScreen> {
     );
   }
 
+  // ─── Slot vacío ───────────────────────────────────────────────────────────
+
   Widget _buildEmptySlot(String roleId, String label, IconData icon) {
     return Card(
       color: const Color(0xFF0F172A),
       margin: const EdgeInsets.only(bottom: 12),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
-        side: const BorderSide(color: Colors.white10), // ✅ 'side' en lugar de 'border'
+        side: const BorderSide(color: Colors.white10),
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -262,21 +259,14 @@ class _StaffScreenState extends State<StaffScreen> {
           ),
           child: Icon(icon, color: Colors.white24, size: 22),
         ),
-        title: Text(
-          label.toUpperCase(),
-          style: const TextStyle(
-            color: Colors.white38,
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1,
-          ),
-        ),
+        title: Text(label.toUpperCase(),
+            style: const TextStyle(color: Colors.white38, fontSize: 10,
+                fontWeight: FontWeight.bold, letterSpacing: 1)),
         subtitle: const Padding(
           padding: EdgeInsets.only(top: 4),
-          child: Text(
-            'Puesto Vacante',
-            style: TextStyle(color: Colors.white24, fontSize: 13, fontWeight: FontWeight.w500),
-          ),
+          child: Text('Puesto Vacante',
+              style: TextStyle(color: Colors.white24, fontSize: 13,
+                  fontWeight: FontWeight.w500)),
         ),
         trailing: ElevatedButton(
           style: ElevatedButton.styleFrom(
@@ -286,112 +276,273 @@ class _StaffScreenState extends State<StaffScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          onPressed: () => _executeHiring(roleId),
-          child: const Text(
-            'CONTRATAR',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDEFF9A)),
-          ),
+          onPressed: () => _showCandidatesSheet(roleId),
+          child: const Text('CONTRATAR',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold,
+                  color: Color(0xFFDEFF9A))),
         ),
       ),
     );
   }
 
-  Future<void> _executeHiring(String roleStr) async {
-    final newMember = await _staffService.hireStaff(roleStr, _currentBudget);
+  // ─── Bottom sheet con candidatos ──────────────────────────────────────────
 
+  Future<void> _showCandidatesSheet(String roleId) async {
+    final staffRole  = _toStaffRole(roleId);
+    final candidates = StaffGenerator.generateCandidates(staffRole, count: 6);
+
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF0F172A),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.65,
+          maxChildSize: 0.92,
+          minChildSize: 0.4,
+          builder: (_, scrollCtrl) {
+            return Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.person_search_rounded,
+                          color: Color(0xFFDEFF9A), size: 20),
+                      const SizedBox(width: 10),
+                      Text(
+                        'CANDIDATOS — ${_getRoleDisplay(roleId).toUpperCase()}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(color: Colors.white10, height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                    itemCount: candidates.length,
+                    itemBuilder: (_, i) {
+                      final c = candidates[i];
+                      final canAfford = _currentBudget >= c.salary;
+                      return _buildCandidateTile(c, roleId, canAfford, ctx);
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCandidateTile(
+      StaffMember candidate, String roleId, bool canAfford, BuildContext sheetCtx) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: canAfford
+            ? const Color(0xFF1E293B)
+            : Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: canAfford
+              ? const Color(0xFFDEFF9A).withOpacity(0.2)
+              : Colors.white10,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      candidate.name,
+                      style: TextStyle(
+                        color: canAfford ? Colors.white : Colors.white38,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${'⭐' * candidate.level}  ·  \$${(candidate.salary / 1000).toStringAsFixed(1)}k/mes',
+                      style: TextStyle(
+                        color: canAfford ? const Color(0xFFDEFF9A) : Colors.white24,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: canAfford ? const Color(0xFFDEFF9A) : Colors.white10,
+                  foregroundColor: Colors.black,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: canAfford
+                    ? () {
+                        Navigator.pop(sheetCtx);
+                        _hireCandidate(candidate, roleId);
+                      }
+                    : null,
+                child: Text(
+                  canAfford ? 'FICHAR' : 'SIN FONDOS',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: canAfford ? Colors.black : Colors.white24,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (candidate.description.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              candidate.description,
+              style: const TextStyle(color: Colors.white38, fontSize: 11, height: 1.3),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // ─── Acciones ─────────────────────────────────────────────────────────────
+
+  Future<void> _hireCandidate(StaffMember candidate, String roleId) async {
+    final finance = await widget.dbService.isar.clubFinances.get(1);
     if (!mounted) return;
 
-    if (newMember != null) {
-      final finance = await widget.dbService.isar.clubFinances.get(1);
-      if (!mounted) return; // ✅ Guard tras segundo await
-
-      if (finance != null) {
-        finance.balance -= newMember.salary;
-        await widget.dbService.isar.writeTxn(() async {
-          await widget.dbService.isar.clubFinances.put(finance);
-        });
-      }
-
-      await _load();
-
-      if (!mounted) return;
+    if (finance == null || finance.balance < candidate.salary) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Has contratado a ${newMember.name} como ${_getRoleDisplay(newMember.role)}.')),
+        const SnackBar(content: Text('No tienes suficiente presupuesto.')),
       );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No tienes suficiente presupuesto para pagar el salario de este miembro.')),
-      );
+      return;
     }
+
+    final newStaff = Staff(
+      name: candidate.name,
+      role: roleId,
+      level: candidate.level,
+      salary: candidate.salary,
+    );
+
+    finance.balance -= candidate.salary;
+
+    await widget.dbService.isar.writeTxn(() async {
+      await widget.dbService.isar.staffs.put(newStaff);
+      await widget.dbService.isar.clubFinances.put(finance);
+    });
+
+    await _staffService.syncGameSave();
+
+    if (!mounted) return;
+    await _load();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${candidate.name} contratado como ${_getRoleDisplay(roleId)}.')),
+    );
   }
 
   Future<void> _trainStaff(Staff staff) async {
     if (staff.level >= 5) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Este miembro ya se encuentra en el nivel máximo.')),
+        const SnackBar(content: Text('Este miembro ya está en el nivel máximo.')),
       );
       return;
     }
 
     final cost = staff.salary * 1.5;
 
-    if (_currentBudget >= cost) {
-      final resultMessage = await _staffService.trainStaff(staff, _currentBudget);
-      if (!mounted) return; // ✅ Guard tras await
-
-      final finance = await widget.dbService.isar.clubFinances.get(1);
-      if (!mounted) return; // ✅ Guard tras segundo await
-
-      if (finance != null) {
-        finance.balance -= cost;
-        await widget.dbService.isar.writeTxn(() async {
-          await widget.dbService.isar.clubFinances.put(finance);
-        });
-      }
-
-      if (!mounted) return;
+    if (_currentBudget < cost) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(resultMessage)),
+        const SnackBar(content: Text('No hay fondos suficientes para el entrenamiento.')),
       );
-      await _load();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No hay fondos suficientes para financiar el entrenamiento.')),
-      );
+      return;
     }
+
+    final msg = await _staffService.trainStaff(staff, _currentBudget);
+    if (!mounted) return;
+
+    final finance = await widget.dbService.isar.clubFinances.get(1);
+    if (!mounted) return;
+
+    if (finance != null) {
+      finance.balance -= cost;
+      await widget.dbService.isar.writeTxn(
+          () => widget.dbService.isar.clubFinances.put(finance));
+    }
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    await _load();
   }
 
   Future<void> _fireStaff(Staff staff) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF0F172A),
-        title: const Text('Confirmar despido', style: TextStyle(color: Colors.white)),
+        title: const Text('Confirmar despido',
+            style: TextStyle(color: Colors.white)),
         content: Text(
-          '¿Estás seguro de que quieres despedir a ${staff.name}?',
+          '¿Estás seguro de que quieres despedir a ${staff.name}?\nNo recibirá indemnización.',
           style: const TextStyle(color: Colors.white54),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('CANCELAR', style: TextStyle(color: Colors.white54)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('CANCELAR',
+                style: TextStyle(color: Colors.white54)),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('DESPEDIR', style: TextStyle(color: Colors.redAccent)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('DESPEDIR',
+                style: TextStyle(color: Colors.redAccent,
+                    fontWeight: FontWeight.bold)),
           ),
         ],
       ),
     );
 
     if (confirm == true && mounted) {
-      final resultMessage = await _staffService.fireStaff(staff);
-
+      final msg = await _staffService.fireStaff(staff);
       if (!mounted) return;
       await _load();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(resultMessage)),
-      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 }

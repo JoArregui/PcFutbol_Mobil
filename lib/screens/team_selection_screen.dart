@@ -2,13 +2,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:isar/isar.dart';
 import '../core/database_service.dart';
-import '../core/squad_service.dart';
-import '../core/finance_service.dart';
+import '../core/game_session_service.dart';
 import '../models/team.dart';
 import 'main_menu_screen.dart';
-
 
 class TeamSelectionScreen extends StatefulWidget {
   final DatabaseService dbService;
@@ -23,10 +20,8 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
   Team? selectedTeam;
   bool _loadingSquad = false;
 
-  // Índice de la tarjeta actualmente girada (-1 = ninguna)
   int _flippedIndex = -1;
 
-  // Un AnimationController por tarjeta
   final Map<int, AnimationController> _controllers = {};
   final Map<int, Animation<double>> _animations = {};
 
@@ -46,17 +41,14 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
   void _flipCard(int index) {
     _initController(index);
 
-    // Si hay otra girada, la cerramos primero
     if (_flippedIndex != -1 && _flippedIndex != index) {
       _controllers[_flippedIndex]?.reverse();
     }
 
     if (_flippedIndex == index) {
-      // Ya estaba girada → cerrar
       _controllers[index]!.reverse();
       setState(() => _flippedIndex = -1);
     } else {
-      // Girar esta
       _controllers[index]!.forward();
       setState(() => _flippedIndex = index);
     }
@@ -64,7 +56,6 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
   }
 
   void _selectTeam(Team team, int index) {
-    // Marcar como seleccionado y volver al frente
     setState(() => selectedTeam = team);
     _controllers[index]?.reverse();
     setState(() => _flippedIndex = -1);
@@ -133,7 +124,6 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
   Widget _buildTeamList(List<Team> teams) {
     return Column(
       children: [
-        // Subtítulo de instrucción
         Padding(
           padding: const EdgeInsets.only(bottom: 4, top: 2),
           child: Text(
@@ -269,7 +259,6 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Cabecera
           Row(
             children: [
               _buildLogo(team.logoUrl),
@@ -298,7 +287,6 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
                   ],
                 ),
               ),
-              // Botón de cerrar
               GestureDetector(
                 onTap: () => _flipCard(index),
                 child: const Icon(Icons.close_rounded,
@@ -306,25 +294,18 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
               ),
             ],
           ),
-
           const SizedBox(height: 12),
           _buildDivider(),
           const SizedBox(height: 12),
-
-          // Datos del contrato dinámicos del CMS
           _buildInfoRow(Icons.account_balance_wallet_outlined,
               "PRESUPUESTO", team.formattedBudget),
           const SizedBox(height: 10),
-          _buildInfoRow(
-              Icons.flag_outlined, "OBJETIVO", info["objetivo"]!),
+          _buildInfoRow(Icons.flag_outlined, "OBJETIVO", info["objetivo"]!),
           const SizedBox(height: 10),
           _buildInfoRow(Icons.bolt_outlined, "EXIGENCIA", info["exigencia"]!),
-
           const SizedBox(height: 14),
           _buildDivider(),
           const SizedBox(height: 12),
-
-          // Botón elegir
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -421,8 +402,7 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
           const SizedBox(height: 20),
           Text(
             "CARGANDO LIGA...",
-            style: GoogleFonts.urbanist(
-                color: Colors.white, letterSpacing: 2),
+            style: GoogleFonts.urbanist(color: Colors.white, letterSpacing: 2),
           ),
         ],
       ),
@@ -437,30 +417,28 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
         height: 58,
         child: ElevatedButton(
           onPressed: selectedTeam == null || _loadingSquad
-    ? null
-    : () async {
-        setState(() => _loadingSquad = true);
+              ? null
+              : () async {
+                  setState(() => _loadingSquad = true);
 
-        await SquadService.fromDatabase(widget.dbService)
-            .ensureSquad(selectedTeam!.apiId);
+                  final session = GameSessionService(widget.dbService.isar);
 
-        await FinanceService(widget.dbService.isar)
-            .initFinances(selectedTeam!);
+                  await session.startSeason(selectedTeam!, {});
 
-        if (!mounted) return; // ✅ mounted sobre State, no context.mounted
+                  if (!mounted) return;
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => MainMenuScreen(
-              userTeam: selectedTeam!, // ✅ 'team' en lugar de 'userTeam'
-              dbService: widget.dbService,
-            ),
-          ),
-        );
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MainMenuScreen(
+                        userTeam: selectedTeam!,
+                        dbService: widget.dbService,
+                      ),
+                    ),
+                  );
 
-        if (mounted) setState(() => _loadingSquad = false);
-      },
+                  if (mounted) setState(() => _loadingSquad = false);
+                },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFDEFF9A),
             foregroundColor: Colors.black,
@@ -471,7 +449,7 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
             elevation: 0,
           ),
           child: Text(
-            _loadingSquad ? 'CONTRATANDO PERSONAL…' : 'TOMAR LAS RIENDAS',
+            _loadingSquad ? 'FIRMANDO CONTRATO…' : 'TOMAR LAS RIENDAS',
             style: GoogleFonts.urbanist(
               fontSize: 15,
               fontWeight: FontWeight.w900,

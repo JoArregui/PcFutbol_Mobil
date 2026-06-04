@@ -160,26 +160,26 @@ class PlayerProgressionService {
     // Tiro (1) y Pase (2): pico 24-29, caída desde 30
     // Defensa (3): pico 25-30, caída desde 31
 
-    final peakStart = [22, 24, 24, 25, 22][statIndex];
-    final peakEnd = [26, 29, 29, 30, 26][statIndex];
+    final peakStart    = [22, 24, 24, 25, 22][statIndex];
+    final peakEnd      = [26, 29, 29, 30, 26][statIndex];
     final declineStart = [28, 30, 30, 31, 28][statIndex];
 
     if (isUnicorn && age < peakStart) {
       // Jóvenes promesas crecen más rápido hacia su potencial
-      final gap = potential - p_avg_approx(statIndex);
+      final gap = potential - pAvgApprox(statIndex);
       return gap > 10 ? 2 : 1;
     }
 
-    if (age < peakStart) return _rng.nextBool() ? 1 : 0; // crecimiento joven
-    if (age <= peakEnd) return _rng.nextDouble() < 0.3 ? 1 : 0; // pico estable
+    if (age < peakStart)     return _rng.nextBool() ? 1 : 0;    // crecimiento joven
+    if (age <= peakEnd)      return _rng.nextDouble() < 0.3 ? 1 : 0;  // pico estable
     if (age <= declineStart) return _rng.nextDouble() < 0.4 ? -1 : 0; // inicio declive
-    if (age <= 32) return _rng.nextDouble() < 0.6 ? -1 : 0; // declive moderado
-    if (age <= 34) return _rng.nextBool() ? -1 : -2; // declive serio
-    return -2; // últimos años
+    if (age <= 32)           return _rng.nextDouble() < 0.6 ? -1 : 0; // declive moderado
+    if (age <= 34)           return _rng.nextBool() ? -1 : -2;        // declive serio
+    return -2;                                                         // últimos años
   }
 
   // Aproximación local para no recalcular la media (evitamos getter en lógica)
-  int p_avg_approx(int statIndex) => 75; // valor neutro de referencia
+  int pAvgApprox(int statIndex) => 75; // valor neutro de referencia
 
   void _applyInjuryDecline(Player p) {
     if (p.stats.length < 5) return;

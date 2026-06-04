@@ -3,9 +3,8 @@ import 'package:isar/isar.dart';
 import '../models/league_fixture.dart';
 import '../models/game_save.dart';
 import '../models/team.dart';
-import '../models/player_model.dart';
 import '../models/game_message.dart';
-import '../models/finance_model.dart';
+import 'game_calendar.dart';
 import 'league_service.dart';
 import 'message_service.dart';
 import 'finance_service.dart';
@@ -68,7 +67,7 @@ class CalendarService {
       );
     }
 
-    return 'Día ${save.currentDay}/7 completado.';
+    return '${GameCalendar.formatShort(seasonNumber: save.seasonNumber, matchday: save.currentMatchday, dayOfWeek: save.currentDay)} completado.';
   }
 
   Future<List<LeagueFixture>> getUserPendingFixtures(int userTeamApiId) async {
@@ -78,6 +77,7 @@ class CalendarService {
     }
 
     final md = save.currentMatchday;
+    // Consulta filtrada directamente por el estado del fixture y la jornada
     final all = await isar.leagueFixtures
         .filter()
         .matchdayEqualTo(md)
@@ -135,6 +135,8 @@ class CalendarService {
         homeGoals,
         awayGoals,
       );
+
+      await league.persistStandingsCache();
     } else {
       await _resolveCup(fixture, userTeamApiId, userWasHome, homeGoals, awayGoals, save);
     }
@@ -227,6 +229,15 @@ class CalendarService {
     );
   }
 
+  Future<bool> _userPlayedHomeInMatchday(int userTeamApiId, int matchday) async {
+    final played = await isar.leagueFixtures
+        .filter()
+        .matchdayEqualTo(matchday)
+        .playedEqualTo(true)
+        .findAll();
+    return played.any((f) => f.homeTeamApiId == userTeamApiId);
+  }
+
   Future<void> _completeMatchday(int userTeamApiId, Team userTeam, GameSave save) async {
     final md = save.currentMatchday;
     final league = LeagueService(isar);
@@ -260,10 +271,28 @@ class CalendarService {
 
     final finance = await isar.clubFinances.get(1);
     if (finance != null) {
-      await league.applyMatchFinancePublic(finance, userTeam);
+      final playedHome = await _userPlayedHomeInMatchday(userTeamApiId, md);
+      await league.applyMatchFinancePublic(
+        finance,
+        userTeam,
+        userPlayedAtHome: playedHome,
+      );
     }
 
     await FinancialGuardService(isar).afterMatchdayWeek(save, userTeam.name);
+
+    if (!save.financiallyDismissed) {
+      final board = BoardService(isar);
+      await board.evaluateWeeklyAcceptance(
+        save: save,
+        userTeam: userTeam,
+        leaguePosition: position ?? 10,
+        finishedMatchday: md,
+      );
+      if (save.boardAcceptance <= 10) {
+        await board.presidentDismissesManager(save, userTeam);
+      }
+    }
 
     save.currentMatchday++;
     save.currentDay = 1;
@@ -281,9 +310,6 @@ class CalendarService {
 
     await TransferAiService(isar).generateMatchdayOffers(userTeamApiId, save.currentMatchday);
 
-    // Se unifica la escritura dentro del único writeTxn padre permitido.
-    // Como 'league.persistStandingsCache()' ya no tiene un writeTxn interno,
-    // se puede ejecutar aquí de forma segura.
     await isar.writeTxn(() async {
       await isar.leagueFixtures.putAll(others);
       await league.persistStandingsCache();

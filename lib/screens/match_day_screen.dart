@@ -11,6 +11,7 @@ import '../core/match_engine.dart';
 import '../models/match_event.dart';
 import '../models/player_model.dart';
 import '../models/team.dart';
+import '../widgets/match_substitution_sheet.dart';
 
 class MatchDayScreen extends StatefulWidget {
   final DatabaseService dbService;
@@ -37,25 +38,48 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
   final List<MatchEvent> _history = [];
   final List<MatchEvent> _fullTimeline = [];
 
-  Stream<MatchEvent>? _matchStream;
   StreamSubscription<MatchEvent>? _subscription;
+
+  List<Player> _userOnField = [];
+  List<Player> _userBench = [];
+  List<Player> _opponentOnField = [];
 
   int _homeScore = 0;
   int _awayScore = 0;
   int _currentMinute = 0;
+  int _substitutionsUsed = 0;
+
   bool _matchStarted = false;
   bool _matchFinished = false;
   bool _loadingSquad = true;
   bool _isPaused = false;
+  bool _halftimeBreak = false;
+  bool _firstHalfDone = false;
+  bool _awaitingSecondHalf = false;
+
   String _userFormation = '4-4-2';
   double _medicoLevel = 1;
   String _matchMode = 'resumen';
+
+  static const int _maxSubstitutions = 5;
 
   Team get _home => widget.userIsHome ? widget.userTeam : widget.opponent;
   Team get _away => widget.userIsHome ? widget.opponent : widget.userTeam;
 
   int get _userScore => widget.userIsHome ? _homeScore : _awayScore;
   int get _opponentScore => widget.userIsHome ? _awayScore : _homeScore;
+
+  List<Player> get _homePlayers =>
+      _home.apiId == widget.userTeam.apiId ? _userOnField : _opponentOnField;
+
+  List<Player> get _awayPlayers =>
+      _away.apiId == widget.userTeam.apiId ? _userOnField : _opponentOnField;
+
+  String get _homeFormation =>
+      _home.apiId == widget.userTeam.apiId ? _userFormation : '4-3-3';
+
+  String get _awayFormation =>
+      _away.apiId == widget.userTeam.apiId ? _userFormation : '4-3-3';
 
   @override
   void initState() {
@@ -79,38 +103,34 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
     final lineup = LineupService(widget.dbService.isar);
     _userFormation = await lineup.getFormation();
 
-    var homePlayers = await widget.dbService.getPlayersByTeam(_home.apiId, professionalsOnly: true);
-    var awayPlayers = await widget.dbService.getPlayersByTeam(_away.apiId, professionalsOnly: true);
-
     final starters = await lineup.getStarters(widget.userTeam.apiId);
-    if (starters.isNotEmpty) {
-      if (_home.apiId == widget.userTeam.apiId) {
-        homePlayers = starters;
-      } else if (_away.apiId == widget.userTeam.apiId) {
-        awayPlayers = starters;
-      }
+    final bench = await lineup.getBench(widget.userTeam.apiId);
+    _userOnField = List<Player>.from(starters);
+    _userBench = List<Player>.from(bench);
+
+    var opponentPlayers =
+        await widget.dbService.getPlayersByTeam(widget.opponent.apiId, professionalsOnly: true);
+    opponentPlayers.sort((a, b) => b.average.compareTo(a.average));
+    _opponentOnField = opponentPlayers.take(11).toList();
+    if (_opponentOnField.isEmpty) _opponentOnField = _placeholderSquad();
+
+    if (_userOnField.isEmpty) _userOnField = _placeholderSquad();
+
+    if (_matchMode == 'resultado') {
+      final timeline = _engine.simulateMatch(
+        home: _home,
+        away: _away,
+        homePlayers: _homePlayers,
+        awayPlayers: _awayPlayers,
+        homeFormation: _homeFormation,
+        awayFormation: _awayFormation,
+        medicoLevel: _medicoLevel,
+      );
+      _fullTimeline.addAll(timeline);
+      final last = timeline.lastWhere((e) => e.isFullTime, orElse: () => timeline.last);
+      _homeScore = last.homeScore ?? 0;
+      _awayScore = last.awayScore ?? 0;
     }
-
-    if (homePlayers.isEmpty) homePlayers = _placeholderSquad();
-    if (awayPlayers.isEmpty) awayPlayers = _placeholderSquad();
-
-    final homeFormation = _home.apiId == widget.userTeam.apiId ? _userFormation : '4-4-2';
-    final awayFormation = _away.apiId == widget.userTeam.apiId ? _userFormation : '4-3-3';
-
-    final timeline = _engine.simulateMatch(
-      home: _home,
-      away: _away,
-      homePlayers: homePlayers,
-      awayPlayers: awayPlayers,
-      homeFormation: homeFormation,
-      awayFormation: awayFormation,
-      medicoLevel: _medicoLevel,
-    );
-    _fullTimeline.addAll(timeline);
-
-    final last = timeline.lastWhere((e) => e.isFullTime, orElse: () => timeline.last);
-    _homeScore = last.homeScore ?? 0;
-    _awayScore = last.awayScore ?? 0;
 
     if (!mounted) return;
 
@@ -119,19 +139,6 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
       if (_matchMode == 'resultado') {
         _matchStarted = true;
         _matchFinished = false;
-      } else {
-        _homeScore = 0;
-        _awayScore = 0;
-
-        _matchStream = _engine.playMatch(
-          home: _home,
-          away: _away,
-          homePlayers: homePlayers,
-          awayPlayers: awayPlayers,
-          homeFormation: homeFormation,
-          awayFormation: awayFormation,
-          medicoLevel: _medicoLevel,
-        );
       }
     });
 
@@ -161,19 +168,74 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
   }
 
   void _startMatch() {
-    if (_matchStream == null || _matchStarted) return;
-
+    if (_matchStarted || _matchMode == 'resultado') return;
     setState(() {
       _matchStarted = true;
       _isPaused = false;
       _history.clear();
+      _fullTimeline.clear();
       _homeScore = 0;
       _awayScore = 0;
       _currentMinute = 0;
+      _firstHalfDone = false;
+      _halftimeBreak = false;
+      _awaitingSecondHalf = false;
+      _substitutionsUsed = 0;
+    });
+    _playFirstHalf();
+  }
+
+  void _playFirstHalf() {
+    _subscription?.cancel();
+    final stream = _engine.playPeriod(
+      home: _home,
+      away: _away,
+      homePlayers: _homePlayers,
+      awayPlayers: _awayPlayers,
+      homeFormation: _homeFormation,
+      awayFormation: _awayFormation,
+      medicoLevel: _medicoLevel,
+      startMinute: 1,
+      endMinute: 45,
+      initialHomeScore: 0,
+      initialAwayScore: 0,
+      kickoffMessage: "¡Arranca el partido! ${_home.name} recibe a ${_away.name}.",
+    );
+
+    _subscription = stream.listen(
+      _onMatchEvent,
+      onDone: () {
+        if (!_firstHalfDone && mounted && !_matchFinished) {
+          _onHalftimeReached();
+        }
+      },
+    );
+  }
+
+  void _playSecondHalf() {
+    _subscription?.cancel();
+    setState(() {
+      _awaitingSecondHalf = false;
+      _halftimeBreak = false;
+      _isPaused = false;
     });
 
-    _subscription?.cancel();
-    _subscription = _matchStream!.listen(
+    final stream = _engine.playPeriod(
+      home: _home,
+      away: _away,
+      homePlayers: _homePlayers,
+      awayPlayers: _awayPlayers,
+      homeFormation: _homeFormation,
+      awayFormation: _awayFormation,
+      medicoLevel: _medicoLevel,
+      startMinute: 46,
+      endMinute: 90,
+      initialHomeScore: _homeScore,
+      initialAwayScore: _awayScore,
+      kickoffMessage: "¡Comienza la 2ª parte con formación $_userFormation!",
+    );
+
+    _subscription = stream.listen(
       _onMatchEvent,
       onDone: () {
         if (!_matchFinished && mounted) {
@@ -190,83 +252,93 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
     );
   }
 
-  void _togglePause() {
-    if (_matchFinished) return;
+  void _onHalftimeReached() {
+    if (_firstHalfDone || _matchFinished) return;
+    _subscription?.cancel();
     setState(() {
-      _isPaused = !_isPaused;
-      if (_isPaused) {
-        _subscription?.pause();
-      } else {
-        _subscription?.resume();
-      }
+      _firstHalfDone = true;
+      _halftimeBreak = true;
+      _isPaused = true;
+      _awaitingSecondHalf = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openSubstitutionMenu(isHalftime: true);
     });
   }
 
-  void _openSubstitutionMenu() {
-    showModalBottomSheet(
+  void _togglePause() {
+    if (_matchFinished || _awaitingSecondHalf) return;
+    if (_isPaused) {
+      setState(() => _isPaused = false);
+      _subscription?.resume();
+    } else {
+      _subscription?.pause();
+      setState(() => _isPaused = true);
+      _openSubstitutionMenu(isHalftime: false);
+    }
+  }
+
+  Future<void> _openSubstitutionMenu({required bool isHalftime}) async {
+    final result = await showModalBottomSheet<MatchSubstitutionResult>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: const Color(0xFF0F172A),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          height: 300,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Row(
-                children: [
-                  Icon(FontAwesomeIcons.userGroup, color: Color(0xFFDEFF9A), size: 18),
-                  SizedBox(width: 12),
-                  Text(
-                    "ÁREA TÉCNICA / CAMBIOS",
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ],
-              ),
-              const Divider(color: Colors.white10, height: 24),
-              const Expanded(
-                child: Center(
-                  child: Text(
-                    "Aquí se gestionará la alineación y los jugadores suplentes disponibles.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white38, fontSize: 13),
-                  ),
-                ),
-              ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFDEFF9A),
-                  minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _togglePause();
-                },
-                child: const Text("REANUDAR PARTIDO", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (_) => MatchSubstitutionSheet(
+        onField: _userOnField,
+        bench: _userBench,
+        formation: _userFormation,
+        substitutionsUsed: _substitutionsUsed,
+        maxSubstitutions: _maxSubstitutions,
+        isHalftime: isHalftime,
+        resumeLabel: isHalftime ? 'COMENZAR 2ª PARTE' : 'REANUDAR PARTIDO',
+      ),
     );
+
+    if (!mounted || result == null) {
+      if (isHalftime && _awaitingSecondHalf) {
+        setState(() => _isPaused = true);
+      }
+      return;
+    }
+
+    setState(() {
+      _userOnField = List<Player>.from(result.onField);
+      _userBench = List<Player>.from(result.bench);
+      _userFormation = result.formation;
+      _substitutionsUsed = result.substitutionsUsed;
+      _isPaused = false;
+    });
+
+    await LineupService(widget.dbService.isar).saveFormation(_userFormation);
+
+    if (isHalftime && _awaitingSecondHalf) {
+      _playSecondHalf();
+    } else if (!_awaitingSecondHalf) {
+      _subscription?.resume();
+    }
   }
 
   void _onMatchEvent(MatchEvent e) {
     if (!mounted || _matchFinished) return;
 
+    _fullTimeline.add(e);
+
     setState(() {
       _currentMinute = e.minute;
       _homeScore = e.homeScore ?? _homeScore;
       _awayScore = e.awayScore ?? _awayScore;
-
       if (e.description.isNotEmpty) {
         _history.insert(0, e);
       }
     });
+
+    if (e.isHalftime) {
+      _onHalftimeReached();
+      return;
+    }
 
     if (e.isFullTime) {
       _onFullTime();
@@ -301,7 +373,10 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF0F172A),
-        title: Text("FINAL — $comp", style: const TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.w900)),
+        title: Text(
+          "FINAL — $comp",
+          style: const TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.w900),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -325,7 +400,10 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
               Navigator.pop(ctx);
               Navigator.pop(context, true);
             },
-            child: const Text("VOLVER AL DESPACHO", style: TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold)),
+            child: const Text(
+              "VOLVER AL DESPACHO",
+              style: TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -354,7 +432,7 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          if (_matchStarted && !_matchFinished && _matchMode != 'resultado')
+          if (_matchStarted && !_matchFinished && _matchMode != 'resultado' && !_awaitingSecondHalf)
             IconButton(
               icon: Icon(
                 _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
@@ -371,15 +449,19 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
             children: [
               _buildScoreboard(),
               if (_loadingSquad)
-                const Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator(color: Color(0xFFDEFF9A)))
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: CircularProgressIndicator(color: Color(0xFFDEFF9A)),
+                )
               else if (!_matchStarted && _matchMode != 'resultado')
                 Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
                       Text(
-                        'Formación: $_userFormation',
+                        'Convocatoria: 11 titulares + ${_userBench.length} suplentes · $_userFormation',
                         style: const TextStyle(color: Colors.white38, fontSize: 11),
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
                       ElevatedButton.icon(
@@ -388,9 +470,36 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
                           minimumSize: const Size(double.infinity, 52),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        onPressed: _matchStream == null ? null : _startMatch,
+                        onPressed: _startMatch,
                         icon: const Icon(Icons.play_arrow_rounded, color: Colors.black),
-                        label: const Text("¡A JUGAR! (RESUMEN)", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+                        label: const Text(
+                          "¡A JUGAR! (RESUMEN)",
+                          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (_awaitingSecondHalf)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'DESCANSO — Ajusta cambios y táctica',
+                        style: TextStyle(color: Colors.amber, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFDEFF9A),
+                          minimumSize: const Size(double.infinity, 48),
+                        ),
+                        onPressed: () => _openSubstitutionMenu(isHalftime: true),
+                        child: const Text(
+                          'ÁREA TÉCNICA',
+                          style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900),
+                        ),
                       ),
                     ],
                   ),
@@ -398,26 +507,22 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
               Expanded(child: _matchStarted ? _buildTicker() : _buildPreMatch()),
             ],
           ),
-          if (_matchStarted && !_matchFinished && _isPaused)
+          if (_matchStarted && !_matchFinished && _isPaused && !_awaitingSecondHalf)
             Positioned(
               bottom: 24,
               left: 20,
               right: 20,
-              child: AnimatedOpacity(
-                duration: const Duration(milliseconds: 200),
-                opacity: _isPaused ? 1.0 : 0.0,
-                child: FloatingActionButton.extended(
-                  backgroundColor: const Color(0xFF1E293B),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    side: const BorderSide(color: Color(0xFFDEFF9A), width: 1),
-                  ),
-                  onPressed: _openSubstitutionMenu,
-                  icon: const Icon(FontAwesomeIcons.userGear, size: 16, color: Color(0xFFDEFF9A)),
-                  label: const Text(
-                    "REALIZAR CAMBIOS / TÁCTICA",
-                    style: TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                  ),
+              child: FloatingActionButton.extended(
+                backgroundColor: const Color(0xFF1E293B),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: const BorderSide(color: Color(0xFFDEFF9A), width: 1),
+                ),
+                onPressed: () => _openSubstitutionMenu(isHalftime: false),
+                icon: const Icon(FontAwesomeIcons.userGear, size: 16, color: Color(0xFFDEFF9A)),
+                label: const Text(
+                  "REALIZAR CAMBIOS / TÁCTICA",
+                  style: TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold, letterSpacing: 0.5),
                 ),
               ),
             ),
@@ -438,8 +543,11 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
             Text(_away.name, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             Text(
-              widget.userIsHome ? "En casa · $_userFormation" : "Fuera · $_userFormation",
+              widget.userIsHome
+                  ? "En casa · $_userFormation · ${_userBench.length} suplentes"
+                  : "Fuera · $_userFormation · ${_userBench.length} suplentes",
               style: const TextStyle(color: Colors.white38, fontSize: 12),
+              textAlign: TextAlign.center,
             ),
             if (_matchMode == 'resultado')
               const Padding(
@@ -465,14 +573,20 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (_isPaused && !_matchFinished)
-                const Padding(
-                  padding: EdgeInsets.only(right: 8),
-                  child: Icon(Icons.pause_circle_filled_rounded, color: Colors.amber, size: 16),
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: Icon(
+                    _halftimeBreak ? Icons.free_breakfast_rounded : Icons.pause_circle_filled_rounded,
+                    color: _halftimeBreak ? Colors.amber : Colors.amber,
+                    size: 16,
+                  ),
                 ),
               Text(
-                _matchStarted ? "$_currentMinute'" : "PREVIA",
+                _awaitingSecondHalf
+                    ? "DESCANSO"
+                    : (_matchStarted ? "$_currentMinute'" : "PREVIA"),
                 style: TextStyle(
-                  color: _isPaused ? Colors.amber : const Color(0xFFDEFF9A),
+                  color: _isPaused || _awaitingSecondHalf ? Colors.amber : const Color(0xFFDEFF9A),
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
@@ -486,7 +600,10 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
               Expanded(child: _teamCol(_home.name, _homeScore, widget.userIsHome)),
               Padding(
                 padding: const EdgeInsets.only(top: 12),
-                child: Text("$_homeScore - $_awayScore", style: const TextStyle(color: Colors.white38, fontSize: 14, fontWeight: FontWeight.bold)),
+                child: Text(
+                  "$_homeScore - $_awayScore",
+                  style: const TextStyle(color: Colors.white38, fontSize: 14, fontWeight: FontWeight.bold),
+                ),
               ),
               Expanded(child: _teamCol(_away.name, _awayScore, !widget.userIsHome)),
             ],
@@ -521,18 +638,23 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
       return const Center(child: Text('Partido registrado.', style: TextStyle(color: Colors.white38)));
     }
     if (_history.isEmpty) {
-      return const Center(child: Text("El partido está en marcha...", style: TextStyle(color: Colors.white38)));
+      return Center(
+        child: Text(
+          _awaitingSecondHalf ? "Descanso. Prepara la 2ª parte..." : "El partido está en marcha...",
+          style: const TextStyle(color: Colors.white38),
+        ),
+      );
     }
 
     return ListView.builder(
-      padding: EdgeInsets.only(left: 14, right: 14, top: 14, bottom: _isPaused ? 85 : 14),
+      padding: EdgeInsets.only(left: 14, right: 14, top: 14, bottom: _isPaused && !_awaitingSecondHalf ? 85 : 14),
       itemCount: _history.length,
       itemBuilder: (_, i) {
         final e = _history[i];
         final isGoal = e.type == EventType.goal;
         final isCard = e.type == EventType.card;
         final isInjury = e.type == EventType.injury;
-        final isBreak = e.minute == 45 || e.isFullTime;
+        final isBreak = e.isHalftime || e.isFullTime;
 
         Color? border;
         if (isGoal) border = const Color(0xFFDEFF9A).withValues(alpha: 0.35);

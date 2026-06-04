@@ -1,12 +1,13 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:isar/isar.dart';
 import '../core/calendar_service.dart';
 import '../core/database_service.dart';
+import '../core/game_calendar.dart';
 import '../core/game_session_service.dart';
-import '../core/lineup_service.dart';
+import '../core/lineup_guard.dart';
 import '../core/message_service.dart';
+import '../models/finance_model.dart';
 import '../models/game_save.dart';
 import '../models/league_fixture.dart';
 import '../models/league_standing.dart';
@@ -23,6 +24,7 @@ import 'player_search_screen.dart';
 import 'secretary_screen.dart';
 import 'squad_screen.dart';
 import 'stadium_screen.dart';
+import 'president_screen.dart';
 import 'staff_screen.dart';
 import 'training_screen.dart';
 import 'transfer_offers_screen.dart';
@@ -41,7 +43,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
   late final GameSessionService _session;
   int _unread = 0;
 
-  // Controladores de animación para el calendario interactivo
   bool _isAdvancingDay = false;
   String _animatingDayLabel = "";
   late AnimationController _calendarController;
@@ -54,7 +55,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
     _session = GameSessionService(widget.dbService.isar);
     _refreshUnread();
 
-    // Configuración de la animación del paso de hoja
     _calendarController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 750),
@@ -85,20 +85,25 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
 
     final currentDay = save.currentDay;
     final currentMatchday = save.currentMatchday;
+    final next = GameCalendar.nextAfterAdvance(
+      matchday: currentMatchday,
+      dayOfWeek: currentDay,
+    );
 
     setState(() {
       _isAdvancingDay = true;
-      _animatingDayLabel = "DÍA $currentDay\nJORNADA $currentMatchday";
+      _animatingDayLabel = GameCalendar.formatAdvanceOverlay(
+        seasonNumber: save.seasonNumber,
+        matchday: next.matchday,
+        dayOfWeek: next.dayOfWeek,
+      );
     });
 
-    // Lanzamos la animación del desprendimiento de la hoja de calendario
     await _calendarController.forward();
 
-    // Ejecutamos el procesamiento del backend.
     final calendarService = CalendarService(widget.dbService.isar);
     await calendarService.advanceDay(widget.userTeam.apiId);
 
-    // Tras pasar el día, verificamos si estábamos en Domingo (Día 7) y ya se jugó el partido.
     if (currentDay == 7) {
       final pending = await calendarService.getUserPendingFixtures(widget.userTeam.apiId);
       if (pending.isEmpty) {
@@ -163,6 +168,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                             _card("STAFF", FontAwesomeIcons.usersCog, () => _go(StaffScreen(dbService: widget.dbService, team: widget.userTeam))),
                             _card("CALENDARIO", FontAwesomeIcons.calendarDays, () => _go(FullCalendarScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
                             _card("CLUB", FontAwesomeIcons.briefcase, () => _go(ClubManagementScreen(dbService: widget.dbService, team: widget.userTeam))),
+                            _card("PRESIDENTE", FontAwesomeIcons.userTie, () => _go(PresidentScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
                             _card("CLASIFIC.", FontAwesomeIcons.rankingStar, () => _go(LeagueTableScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
                             _card("MENSAJES", FontAwesomeIcons.envelope, () async {
                               await _go(SecretaryScreen(dbService: widget.dbService));
@@ -196,7 +202,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
               builder: (context, child) {
                 return Transform(
                   transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.0015) // Perspectiva 3D
+                    ..setEntry(3, 2, 0.0015)
                     ..rotateX(_flipAnimation.value)
                     ..scale(_scaleAnimation.value),
                   alignment: Alignment.center,
@@ -243,7 +249,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                               children: [
                                 Text(
                                   _animatingDayLabel.split('\n')[0],
-                                  style: const TextStyle(color: Color(0xFF0F172A), fontSize: 28, fontWeight: FontWeight.w900, height: 1.1),
+                                  style: const TextStyle(color: Color(0xFF0F172A), fontSize: 22, fontWeight: FontWeight.w900, height: 1.1),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 12),
@@ -302,7 +308,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(4)),
                     child: Text(
-                      "D${save.currentDay}/7",
+                      GameCalendar.formatHeader(
+                        seasonNumber: save.seasonNumber,
+                        matchday: save.currentMatchday,
+                        dayOfWeek: save.currentDay,
+                      ),
                       style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 11),
                     ),
                   ),
@@ -333,7 +343,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                   style: const TextStyle(color: Colors.redAccent, fontSize: 9, fontWeight: FontWeight.bold),
                 ),
               const SizedBox(height: 6),
-              _buildMatchModeChip(save),
+              _buildBoardAcceptanceBar(save),
             ],
             if (save?.financiallyDismissed == true)
               const Padding(
@@ -384,25 +394,48 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
     );
   }
 
-  Widget _buildMatchModeChip(GameSave save) {
-    final isResumen = save.matchMode != 'resultado';
-    return GestureDetector(
-      onTap: () async {
-        save.matchMode = isResumen ? 'resultado' : 'resumen';
-        await widget.dbService.isar.writeTxn(() => widget.dbService.isar.gameSaves.put(save));
-        if (mounted) setState(() {});
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.white12),
-          borderRadius: BorderRadius.circular(8),
+  Widget _buildBoardAcceptanceBar(GameSave save) {
+    final v = save.boardAcceptance;
+    final color = v >= 70
+        ? const Color(0xFFDEFF9A)
+        : v >= 45
+            ? Colors.amber
+            : Colors.redAccent;
+    final feedback = save.boardLastFeedback.isNotEmpty
+        ? save.boardLastFeedback
+        : 'La directiva evaluará tu trabajo al cerrar cada jornada.';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              'CONFIANZA DIRECTIVA: $v%',
+              style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: v / 100,
+                  minHeight: 4,
+                  backgroundColor: Colors.white10,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
         ),
-        child: Text(
-          "PARTIDO: ${isResumen ? 'RESUMEN' : 'RESULTADO'} (tocar)",
-          style: const TextStyle(color: Colors.white38, fontSize: 9, fontWeight: FontWeight.bold),
+        const SizedBox(height: 4),
+        Text(
+          feedback,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Colors.white38, fontSize: 8, height: 1.2),
         ),
-      ),
+      ],
     );
   }
 
@@ -429,12 +462,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                 backgroundColor: const Color(0xFFDEFF9A),
                 minimumSize: const Size(double.infinity, 52),
               ),
-              onPressed: save?.financiallyDismissed == true
-                  ? null
-                  : () async {
-                      await _session.startNextSeason(widget.userTeam);
-                      if (mounted) setState(() {});
-                    },
+              onPressed: () async {
+                await _session.startNextSeason(widget.userTeam);
+                if (mounted) setState(() {});
+              },
               child: const Text("NUEVA TEMPORADA", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
             ),
           ],
@@ -442,52 +473,70 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
       );
     }
 
-    // El partido solo es jugable el Día 7 (Domingo)
     final isMatchdayDay = save?.currentDay == 7;
 
-    return FutureBuilder<List<LeagueFixture>>(
-      future: CalendarService(widget.dbService.isar).getUserPendingFixtures(widget.userTeam.apiId),
-      builder: (context, fixSnap) {
-        final fixtures = fixSnap.data ?? [];
-        
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (fixtures.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  'JORNADA ${save!.currentMatchday} — ${fixtures.length} partido(s)',
-                  style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold),
-                ),
-              ),
-              ...fixtures.map((f) => FutureBuilder<Team?>(
-                    future: CalendarService(widget.dbService.isar).opponentFor(f, widget.userTeam.apiId),
-                    builder: (context, oppSnap) {
-                      final opp = oppSnap.data;
-                      final isHome = CalendarService(widget.dbService.isar).userIsHome(f, widget.userTeam.apiId);
-                      final isCup = f.competition == 'copa';
-                      
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: _matchBar(
-                          label: isCup ? 'COPA DEL REY' : 'LIGA',
-                          opponent: opp?.name ?? '—',
-                          isHome: isHome,
-                          onTap: (opp == null || !isMatchdayDay) 
-                              ? null 
-                              : () => _playMatch(opp, isHome, f),
-                          accent: !isMatchdayDay 
-                              ? const Color(0xFF1E293B).withValues(alpha: 0.4)
-                              : (isCup ? const Color(0xFF1E293B) : const Color(0xFFDEFF9A)),
-                          textColor: !isMatchdayDay 
-                              ? Colors.white24 
-                              : (isCup ? const Color(0xFFDEFF9A) : Colors.black),
-                          isLocked: !isMatchdayDay,
-                        ),
-                      );
-                    },
-                  )),
+    return StreamBuilder<ClubFinance?>(
+      stream: widget.dbService.isar.clubFinances.watchObject(1, fireImmediately: true),
+      builder: (context, financeSnap) {
+        final ticketPrice = financeSnap.data?.ticketPrice;
+
+        return FutureBuilder<List<LeagueFixture>>(
+          future: CalendarService(widget.dbService.isar).getUserPendingFixtures(widget.userTeam.apiId),
+          builder: (context, fixSnap) {
+            final fixtures = fixSnap.data ?? [];
+            final hasHomeFixture = fixtures.any(
+              (f) => CalendarService(widget.dbService.isar).userIsHome(f, widget.userTeam.apiId),
+            );
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (fixtures.isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'JORNADA ${save!.currentMatchday} — ${fixtures.length} partido(s)',
+                      style: const TextStyle(color: Colors.white38, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (hasHomeFixture && isMatchdayDay)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _ticketReminderBanner(ticketPrice),
+                    ),
+                  ...fixtures.map((f) => FutureBuilder<Team?>(
+                        future: CalendarService(widget.dbService.isar).opponentFor(f, widget.userTeam.apiId),
+                        builder: (context, oppSnap) {
+                          final opp = oppSnap.data;
+                          final isHome = CalendarService(widget.dbService.isar).userIsHome(f, widget.userTeam.apiId);
+                          final isCup = f.competition == 'copa';
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _matchBar(
+                              label: isCup ? 'COPA DEL REY' : 'LIGA',
+                              opponent: opp?.name ?? '—',
+                              isHome: isHome,
+                              seasonNumber: save.seasonNumber,
+                              matchday: save.currentMatchday,
+                              ticketPrice: ticketPrice,
+                              onEditTickets: isHome && isMatchdayDay
+                                  ? () => _go(FinanceScreen(dbService: widget.dbService, userTeam: widget.userTeam))
+                                  : null,
+                              onTap: (opp == null || !isMatchdayDay)
+                                  ? null
+                                  : () => _playMatch(opp, isHome, f),
+                              accent: !isMatchdayDay
+                                  ? const Color(0xFF1E293B).withValues(alpha: 0.4)
+                                  : (isCup ? const Color(0xFF1E293B) : const Color(0xFFDEFF9A)),
+                              textColor: !isMatchdayDay
+                                  ? Colors.white24
+                                  : (isCup ? const Color(0xFFDEFF9A) : Colors.black),
+                              isLocked: !isMatchdayDay,
+                            ),
+                          );
+                        },
+                      )),
             ] else ...[
               const Padding(
                 padding: EdgeInsets.only(bottom: 24),
@@ -511,10 +560,41 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                 style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
               ),
             ),
-            const SizedBox(height: 8),
-          ],
+                const SizedBox(height: 8),
+              ],
+            );
+          },
         );
       },
+    );
+  }
+
+  Widget _ticketReminderBanner(double? ticketPrice) {
+    return GestureDetector(
+      onTap: () => _go(FinanceScreen(dbService: widget.dbService, userTeam: widget.userTeam)),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0F172A),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFDEFF9A).withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.confirmation_number_outlined, color: Color(0xFFDEFF9A), size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                ticketPrice != null
+                    ? 'Partido LOCAL: entradas a ${ticketPrice.toStringAsFixed(0)} €. Toca para ajustar precio.'
+                    : 'Partido LOCAL: revisa el precio de las entradas en Finanzas.',
+                style: const TextStyle(color: Colors.white70, fontSize: 10, height: 1.3),
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white24, size: 18),
+          ],
+        ),
+      ),
     );
   }
 
@@ -530,11 +610,18 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
     required String label,
     required String opponent,
     required bool isHome,
+    required int seasonNumber,
+    required int matchday,
     required VoidCallback? onTap,
+    double? ticketPrice,
+    VoidCallback? onEditTickets,
     Color accent = const Color(0xFFDEFF9A),
     Color textColor = Colors.black,
     bool isLocked = false,
   }) {
+    final venueLabel = isHome ? 'LOCAL' : 'VISITANTE';
+    final venueColor = isHome ? const Color(0xFF22C55E) : const Color(0xFF64748B);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -545,21 +632,77 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
           border: isLocked ? Border.all(color: Colors.white10) : null,
         ),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 9, fontWeight: FontWeight.bold)),
-                  Text("VS ${opponent.toUpperCase()}", style: TextStyle(color: textColor, fontSize: 15, fontWeight: FontWeight.w900)),
-                  Text(
-                    isLocked ? "BLOQUEADO HASTA EL DOMINGO (D7)" : (isHome ? "EN CASA" : "FUERA"),
-                    style: TextStyle(
-                      color: isLocked ? Colors.white24 : textColor.withValues(alpha: 0.55), 
-                      fontSize: 10, 
-                      fontWeight: isLocked ? FontWeight.bold : FontWeight.normal
-                    ),
+                  Row(
+                    children: [
+                      Text(label, style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 9, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: isLocked ? Colors.white10 : venueColor.withValues(alpha: isHome ? 0.25 : 0.35),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isLocked ? Colors.white24 : venueColor.withValues(alpha: 0.8),
+                          ),
+                        ),
+                        child: Text(
+                          venueLabel,
+                          style: TextStyle(
+                            color: isLocked ? Colors.white38 : Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.8,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 6),
+                  Text("VS ${opponent.toUpperCase()}", style: TextStyle(color: textColor, fontSize: 15, fontWeight: FontWeight.w900)),
+                  if (isLocked)
+                    Text(
+                      'BLOQUEADO HASTA EL ${GameCalendar.formatMatchdaySunday(seasonNumber: seasonNumber, matchday: matchday).toUpperCase()}',
+                      style: const TextStyle(
+                        color: Colors.white24,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  else if (isHome) ...[
+                    Text(
+                      ticketPrice != null
+                          ? "Taquilla: ${ticketPrice.toStringAsFixed(0)} €/entrada"
+                          : "Partido en tu estadio — cobras taquilla",
+                      style: TextStyle(color: textColor.withValues(alpha: 0.65), fontSize: 10),
+                    ),
+                    if (onEditTickets != null)
+                      GestureDetector(
+                        onTap: onEditTickets,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            "Ajustar precio entradas →",
+                            style: TextStyle(
+                              color: textColor.withValues(alpha: 0.85),
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                              decorationColor: textColor.withValues(alpha: 0.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ] else
+                    Text(
+                      "Sin taquilla (visitante)",
+                      style: TextStyle(color: textColor.withValues(alpha: 0.55), fontSize: 10),
+                    ),
                 ],
               ),
             ),
@@ -575,61 +718,21 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
   }
 
   Future<void> _playMatch(Team opponent, bool userIsHome, LeagueFixture fixture) async {
-    // 1. Control de plantilla mínima global (Regla PC Fútbol)
     if (!await _session.meetsMinimumSquad(widget.userTeam.apiId)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Plantilla insuficiente: mínimo 16 jugadores (regla PC Fútbol 7).")),
+        const SnackBar(content: Text('Plantilla insuficiente.')),
       );
       return;
     }
 
-    // 2. INTERCEPCIÓN TÁCTICA: Validación rigurosa del 11 inicial guardado
-    final lineup = LineupService(widget.dbService.isar);
-    final isValid = await lineup.hasValidLineup(widget.userTeam.apiId);
+    final lineupOk = await LineupGuard.ensureBeforeMatch(
+      context: context,
+      isar: widget.dbService.isar,
+      userTeam: widget.userTeam,
+    );
+    if (!lineupOk || !mounted) return;
 
-    if (!isValid) {
-      if (!mounted) return;
-      
-      // Diálogo persistente e informativo para advertir de la obligación del once inicial
-      await showDialog(
-        context: context,
-        barrierDismissible: false, 
-        builder: (BuildContext context) {
-          return AlertDialog(
-            backgroundColor: const Color(0xFF0F172A),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text(
-              "⚙️ AVISO DEL SEGUNDO ENTRENADOR", 
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14, letterSpacing: 0.5)
-            ),
-            content: const Text(
-              "No has seleccionado los 11 titulares para el encuentro de hoy.\n\nEs obligatorio configurar tu estrategia y designar un guardameta profesional apto antes de saltar al terreno de juego.",
-              style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text(
-                  "ESTABLECER ALINEACIÓN", 
-                  style: TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold)
-                ),
-              ),
-            ],
-          );
-        },
-      );
-
-      // Redirección inmediata y automatizada a la pizarra táctica para facilitar la gestión
-      await _go(LineupScreen(dbService: widget.dbService, userTeam: widget.userTeam));
-      
-      // Segunda comprobación post-retorno para verificar si el usuario completó la tarea o canceló
-      final stillInvalid = !await lineup.hasValidLineup(widget.userTeam.apiId);
-      if (stillInvalid) return; 
-    }
-
-    // 3. El mánager ha cumplido las exigencias del cuerpo técnico: Arrancamos el partido
-    if (!mounted) return;
     await Navigator.push(
       context,
       MaterialPageRoute(

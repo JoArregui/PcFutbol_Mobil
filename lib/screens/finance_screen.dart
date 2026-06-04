@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:isar/isar.dart';
 import '../core/database_service.dart';
 import '../models/finance_model.dart';
 import '../models/team.dart';

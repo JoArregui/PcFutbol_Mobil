@@ -17,13 +17,18 @@ const UserLineupSchema = CollectionSchema(
   name: r'UserLineup',
   id: 1503161085836371174,
   properties: {
-    r'formation': PropertySchema(
+    r'benchPlayerIds': PropertySchema(
       id: 0,
+      name: r'benchPlayerIds',
+      type: IsarType.longList,
+    ),
+    r'formation': PropertySchema(
+      id: 1,
       name: r'formation',
       type: IsarType.string,
     ),
     r'starterPlayerIds': PropertySchema(
-      id: 1,
+      id: 2,
       name: r'starterPlayerIds',
       type: IsarType.longList,
     )
@@ -48,6 +53,7 @@ int _userLineupEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
+  bytesCount += 3 + object.benchPlayerIds.length * 8;
   bytesCount += 3 + object.formation.length * 3;
   bytesCount += 3 + object.starterPlayerIds.length * 8;
   return bytesCount;
@@ -59,8 +65,9 @@ void _userLineupSerialize(
   List<int> offsets,
   Map<Type, List<int>> allOffsets,
 ) {
-  writer.writeString(offsets[0], object.formation);
-  writer.writeLongList(offsets[1], object.starterPlayerIds);
+  writer.writeLongList(offsets[0], object.benchPlayerIds);
+  writer.writeString(offsets[1], object.formation);
+  writer.writeLongList(offsets[2], object.starterPlayerIds);
 }
 
 UserLineup _userLineupDeserialize(
@@ -70,9 +77,10 @@ UserLineup _userLineupDeserialize(
   Map<Type, List<int>> allOffsets,
 ) {
   final object = UserLineup();
-  object.formation = reader.readString(offsets[0]);
+  object.benchPlayerIds = reader.readLongList(offsets[0]) ?? [];
+  object.formation = reader.readString(offsets[1]);
   object.id = id;
-  object.starterPlayerIds = reader.readLongList(offsets[1]) ?? [];
+  object.starterPlayerIds = reader.readLongList(offsets[2]) ?? [];
   return object;
 }
 
@@ -84,8 +92,10 @@ P _userLineupDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readString(offset)) as P;
+      return (reader.readLongList(offset) ?? []) as P;
     case 1:
+      return (reader.readString(offset)) as P;
+    case 2:
       return (reader.readLongList(offset) ?? []) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -183,6 +193,151 @@ extension UserLineupQueryWhere
 
 extension UserLineupQueryFilter
     on QueryBuilder<UserLineup, UserLineup, QFilterCondition> {
+  QueryBuilder<UserLineup, UserLineup, QAfterFilterCondition>
+      benchPlayerIdsElementEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'benchPlayerIds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UserLineup, UserLineup, QAfterFilterCondition>
+      benchPlayerIdsElementGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'benchPlayerIds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UserLineup, UserLineup, QAfterFilterCondition>
+      benchPlayerIdsElementLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'benchPlayerIds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<UserLineup, UserLineup, QAfterFilterCondition>
+      benchPlayerIdsElementBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'benchPlayerIds',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<UserLineup, UserLineup, QAfterFilterCondition>
+      benchPlayerIdsLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'benchPlayerIds',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<UserLineup, UserLineup, QAfterFilterCondition>
+      benchPlayerIdsIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'benchPlayerIds',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<UserLineup, UserLineup, QAfterFilterCondition>
+      benchPlayerIdsIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'benchPlayerIds',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<UserLineup, UserLineup, QAfterFilterCondition>
+      benchPlayerIdsLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'benchPlayerIds',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<UserLineup, UserLineup, QAfterFilterCondition>
+      benchPlayerIdsLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'benchPlayerIds',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<UserLineup, UserLineup, QAfterFilterCondition>
+      benchPlayerIdsLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'benchPlayerIds',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
   QueryBuilder<UserLineup, UserLineup, QAfterFilterCondition> formationEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -566,6 +721,12 @@ extension UserLineupQuerySortThenBy
 
 extension UserLineupQueryWhereDistinct
     on QueryBuilder<UserLineup, UserLineup, QDistinct> {
+  QueryBuilder<UserLineup, UserLineup, QDistinct> distinctByBenchPlayerIds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'benchPlayerIds');
+    });
+  }
+
   QueryBuilder<UserLineup, UserLineup, QDistinct> distinctByFormation(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -585,6 +746,13 @@ extension UserLineupQueryProperty
   QueryBuilder<UserLineup, int, QQueryOperations> idProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'id');
+    });
+  }
+
+  QueryBuilder<UserLineup, List<int>, QQueryOperations>
+      benchPlayerIdsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'benchPlayerIds');
     });
   }
 

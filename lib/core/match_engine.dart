@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 import '../models/match_event.dart';
 import '../models/player_model.dart';
@@ -28,19 +27,72 @@ class MatchEngine {
     String awayFormation = '4-4-2',
     double medicoLevel = 1,
   }) {
-    int homeScore = 0;
-    int awayScore = 0;
+    final first = simulatePeriod(
+      home: home,
+      away: away,
+      homePlayers: homePlayers,
+      awayPlayers: awayPlayers,
+      homeFormation: homeFormation,
+      awayFormation: awayFormation,
+      medicoLevel: medicoLevel,
+      startMinute: 1,
+      endMinute: 45,
+      initialHomeScore: 0,
+      initialAwayScore: 0,
+      kickoffMessage: "¡Arranca el partido! ${home.name} recibe a ${away.name}.",
+    );
+
+    final halfTimeScore = first.isNotEmpty ? first.last : null;
+    final homeScore = halfTimeScore?.homeScore ?? 0;
+    final awayScore = halfTimeScore?.awayScore ?? 0;
+
+    final second = simulatePeriod(
+      home: home,
+      away: away,
+      homePlayers: homePlayers,
+      awayPlayers: awayPlayers,
+      homeFormation: homeFormation,
+      awayFormation: awayFormation,
+      medicoLevel: medicoLevel,
+      startMinute: 46,
+      endMinute: 90,
+      initialHomeScore: homeScore,
+      initialAwayScore: awayScore,
+      kickoffMessage: "¡Comienza la 2ª parte!",
+    );
+
+    return [...first, ...second];
+  }
+
+  List<MatchEvent> simulatePeriod({
+    required Team home,
+    required Team away,
+    required List<Player> homePlayers,
+    required List<Player> awayPlayers,
+    required int startMinute,
+    required int endMinute,
+    required int initialHomeScore,
+    required int initialAwayScore,
+    String homeFormation = '4-4-2',
+    String awayFormation = '4-4-2',
+    double medicoLevel = 1,
+    String? kickoffMessage,
+  }) {
+    int homeScore = initialHomeScore;
+    int awayScore = initialAwayScore;
     final events = <MatchEvent>[];
     final homeMod = TacticsService.modifiers(homeFormation);
     final awayMod = TacticsService.modifiers(awayFormation);
 
-    events.add(MatchEvent(
-      minute: 0,
-      type: EventType.comment,
-      description: "¡Arranca el partido! ${home.name} recibe a ${away.name}.",
-      homeScore: 0,
-      awayScore: 0,
-    ));
+    if (kickoffMessage != null) {
+      events.add(MatchEvent(
+        minute: startMinute == 1 ? 0 : startMinute,
+        type: EventType.comment,
+        description: kickoffMessage,
+        homeScore: homeScore,
+        awayScore: awayScore,
+      ));
+    }
 
     final homeStrength = _squadStrength(homePlayers) * homeMod.attack;
     final awayStrength = _squadStrength(awayPlayers) * awayMod.attack;
@@ -49,7 +101,7 @@ class MatchEngine {
     final homeBias = homeStrength / (homeStrength + awayStrength + 0.01);
     final homeConcedeBias = awayStrength / (homeDef + awayDef + 0.01);
 
-    for (int min = 1; min <= 90; min++) {
+    for (int min = startMinute; min <= endMinute; min++) {
       final roll = _rng.nextDouble();
 
       if (roll < 0.055 * homeBias + 0.02) {
@@ -126,17 +178,18 @@ class MatchEngine {
         ));
       }
 
-      if (min == 45) {
+      if (min == 45 && endMinute >= 45) {
         events.add(MatchEvent(
           minute: 45,
           type: EventType.comment,
           description: "DESCANSO — ${home.name} $homeScore - $awayScore ${away.name}",
           homeScore: homeScore,
           awayScore: awayScore,
+          isHalftime: true,
         ));
       }
 
-      if (min == 90) {
+      if (min == 90 && endMinute >= 90) {
         events.add(MatchEvent(
           minute: 90,
           type: EventType.comment,
@@ -151,17 +204,22 @@ class MatchEngine {
     return events;
   }
 
-  Stream<MatchEvent> playMatch({
+  Stream<MatchEvent> playPeriod({
     required Team home,
     required Team away,
     required List<Player> homePlayers,
     required List<Player> awayPlayers,
+    required int startMinute,
+    required int endMinute,
+    required int initialHomeScore,
+    required int initialAwayScore,
     String homeFormation = '4-4-2',
     String awayFormation = '4-4-2',
     double speedMultiplier = 1.0,
     double medicoLevel = 1,
+    String? kickoffMessage,
   }) async* {
-    final timeline = simulateMatch(
+    final timeline = simulatePeriod(
       home: home,
       away: away,
       homePlayers: homePlayers,
@@ -169,6 +227,11 @@ class MatchEngine {
       homeFormation: homeFormation,
       awayFormation: awayFormation,
       medicoLevel: medicoLevel,
+      startMinute: startMinute,
+      endMinute: endMinute,
+      initialHomeScore: initialHomeScore,
+      initialAwayScore: initialAwayScore,
+      kickoffMessage: kickoffMessage,
     );
 
     final delayMs = (400 / speedMultiplier).round().clamp(60, 1500);
@@ -179,6 +242,33 @@ class MatchEngine {
       }
       yield event;
     }
+  }
+
+  Stream<MatchEvent> playMatch({
+    required Team home,
+    required Team away,
+    required List<Player> homePlayers,
+    required List<Player> awayPlayers,
+    String homeFormation = '4-4-2',
+    String awayFormation = '4-4-2',
+    double speedMultiplier = 1.0,
+    double medicoLevel = 1,
+  }) async* {
+    yield* playPeriod(
+      home: home,
+      away: away,
+      homePlayers: homePlayers,
+      awayPlayers: awayPlayers,
+      homeFormation: homeFormation,
+      awayFormation: awayFormation,
+      speedMultiplier: speedMultiplier,
+      medicoLevel: medicoLevel,
+      startMinute: 1,
+      endMinute: 90,
+      initialHomeScore: 0,
+      initialAwayScore: 0,
+      kickoffMessage: "¡Arranca el partido! ${home.name} recibe a ${away.name}.",
+    );
   }
 
   double _squadStrength(List<Player> players) {

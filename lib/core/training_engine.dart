@@ -42,7 +42,7 @@ class TrainingEngine {
     }
 
     // 1. Elección de foco aleatorio de la semana
-    final foci = TrainingFocus.values;
+    const foci = TrainingFocus.values;
     final randomFocus = foci[_random.nextInt(foci.length)];
 
     // 2. Ordenación lógica de jugadores por prioridad de desarrollo:

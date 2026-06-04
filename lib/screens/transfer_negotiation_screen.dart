@@ -94,12 +94,18 @@ class TransferNegotiationScreenState
   int _calcPrestige(String name) {
     final n = name.toLowerCase();
     if (n.contains('madrid') || n.contains('barcelona') || n.contains('city') ||
-        n.contains('united') || n.contains('psg') || n.contains('bayern')) return 3;
+        n.contains('united') || n.contains('psg') || n.contains('bayern')) {
+      return 3;
+    }
     if (n.contains('atlético') || n.contains('atletico') || n.contains('sevilla') ||
         n.contains('liverpool') || n.contains('arsenal') || n.contains('chelsea') ||
-        n.contains('juventus') || n.contains('milan') || n.contains('inter')) return 2;
+        n.contains('juventus') || n.contains('milan') || n.contains('inter')) {
+      return 2;
+    }
     if (n.contains('valencia') || n.contains('betis') || n.contains('sociedad') ||
-        n.contains('villarreal') || n.contains('napoli') || n.contains('roma')) return 1;
+        n.contains('villarreal') || n.contains('napoli') || n.contains('roma')) {
+      return 1;
+    }
     return 0;
   }
 
@@ -268,14 +274,27 @@ class TransferNegotiationScreenState
         elevation: 0,
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(child: _buildAgentArea()),
-            _buildClauseToggle(),
-            if (_showClausePanel) _buildClausePanel(),
-            _buildBottomBar(),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                ),
+                child: IntrinsicHeight(
+                  child: Column(
+                    children: [
+                      _buildHeader(),
+                      Expanded(child: _buildAgentArea()),
+                      _buildClauseToggle(),
+                      if (_showClausePanel) _buildClausePanel(),
+                      _buildBottomBar(),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

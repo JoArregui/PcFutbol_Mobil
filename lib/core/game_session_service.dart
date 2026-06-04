@@ -5,18 +5,12 @@ import '../models/staff_member.dart';
 import '../models/team.dart';
 import '../models/finance_model.dart';
 import '../models/league_fixture.dart';
-import '../models/league_standing.dart';
-import '../models/user_lineup.dart';
 import 'league_service.dart';
-import 'lineup_service.dart';
 import 'message_service.dart';
 import 'calendar_service.dart';
 import 'board_service.dart';
 import 'youth_service.dart';
 import 'squad_service.dart';
-import '../models/player_model.dart';
-import '../models/cup_fixture.dart';
-import '../models/transfer_offer.dart';
 
 class GameSessionService {
   final Isar isar;
@@ -108,13 +102,16 @@ class GameSessionService {
       ..currentMatchday = 1
       ..currentDay = 1
       ..totalMatchdays = totalMatchdays
-      ..staffSecretaryName = staff[StaffRole.secretario]?.name ?? "Sin asignar"
-      ..staffSecretaryLevel = staff[StaffRole.secretario]?.level ?? 1
-      ..staffPreparatorName = staff[StaffRole.preparador]?.name ?? "Sin asignar"
-      ..staffPreparatorLevel = staff[StaffRole.preparador]?.level ?? 1
-      ..staffMedicoName = staff[StaffRole.medico]?.name ?? "Sin asignar"
-      ..staffMedicoLevel = staff[StaffRole.medico]?.level ?? 1
+      ..staffSecretaryName = staff[StaffRole.secretario]?.name ?? ''
+      ..staffSecretaryLevel = staff[StaffRole.secretario]?.level ?? 0
+      ..staffPreparatorName = staff[StaffRole.preparador]?.name ?? ''
+      ..staffPreparatorLevel = staff[StaffRole.preparador]?.level ?? 0
+      ..staffMedicoName = staff[StaffRole.medico]?.name ?? ''
+      ..staffMedicoLevel = staff[StaffRole.medico]?.level ?? 0
       ..boardObjectiveLabel = 'En evaluación'
+      ..boardAcceptance = 75
+      ..boardLastFeedback =
+          'El presidente te da la bienvenida. Cumple el objetivo deportivo y cuida las finanzas del club.'
       ..consecutiveRedWeeks = 0
       ..financiallyDismissed = false;
 
@@ -127,7 +124,6 @@ class GameSessionService {
 
     await SquadService(isar).ensureAllTeams();
     await SquadService(isar).ensureSquad(userTeam.apiId);
-    await LineupService(isar).autoPickBest11(userTeam.apiId);
     await CalendarService(isar).initCupForSeason(userTeam.apiId);
     
     await YouthService(isar).scoutYouth(teamApiId: userTeam.apiId, count: 4);
@@ -140,9 +136,9 @@ class GameSessionService {
       type: MessageType.board,
     );
     await msg.add(
-      title: "Secretario técnico",
+      title: "Plantilla lista",
       body:
-          "${save.staffSecretaryName} informa: plantilla lista. Consulta clasificación y mercado cuando quieras.",
+          "Tu equipo está preparado. Contrata el cuerpo técnico en Staff y revisa la alineación antes del primer partido.",
       type: MessageType.general,
     );
   }
@@ -180,7 +176,6 @@ class GameSessionService {
     await YouthService(isar).scoutYouth(teamApiId: userTeam.apiId, count: 4);
     
     await SquadService(isar).ensureAllTeams();
-    await LineupService(isar).autoPickBest11(userTeam.apiId);
 
     await isar.writeTxn(() => isar.gameSaves.put(save));
 

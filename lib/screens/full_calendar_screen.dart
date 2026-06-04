@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/calendar_service.dart';
 import '../core/database_service.dart';
+import '../core/game_calendar.dart';
 import '../models/league_fixture.dart';
 import '../models/team.dart';
 
@@ -21,6 +22,7 @@ class FullCalendarScreen extends StatefulWidget {
 class _FullCalendarScreenState extends State<FullCalendarScreen> {
   late final CalendarService _calendar;
   List<LeagueFixture> _fixtures = [];
+  int _seasonNumber = 1;
   bool _loading = true;
 
   @override
@@ -32,9 +34,11 @@ class _FullCalendarScreenState extends State<FullCalendarScreen> {
 
   Future<void> _load() async {
     final list = await _calendar.getFullUserCalendar(widget.userTeam.apiId);
+    final save = await widget.dbService.isar.gameSaves.get(1);
     if (!mounted) return;
     setState(() {
       _fixtures = list;
+      _seasonNumber = save?.seasonNumber ?? 1;
       _loading = false;
     });
   }
@@ -92,12 +96,18 @@ class _FullCalendarScreenState extends State<FullCalendarScreen> {
           child: Row(
             children: [
               SizedBox(
-                width: 84,
+                width: 72,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('J${f.matchday}', style: const TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold)),
-                    Text(comp, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+                    Text(
+                      GameCalendar.formatMatchdaySunday(
+                        seasonNumber: _seasonNumber,
+                        matchday: f.matchday,
+                      ),
+                      style: const TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                    Text('J${f.matchday}', style: const TextStyle(color: Colors.white38, fontSize: 10)),
                   ],
                 ),
               ),
@@ -110,7 +120,7 @@ class _FullCalendarScreenState extends State<FullCalendarScreen> {
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      isHome ? 'EN CASA · Día 7' : 'FUERA · Día 7',
+                      '$comp · ${isHome ? 'LOCAL' : 'VISITANTE'}',
                       style: const TextStyle(color: Colors.white38, fontSize: 11),
                     ),
                   ],
@@ -130,4 +140,3 @@ class _FullCalendarScreenState extends State<FullCalendarScreen> {
     );
   }
 }
-

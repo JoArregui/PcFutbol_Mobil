@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/database_service.dart';
 import '../core/league_service.dart';
+import '../core/staff_service.dart';
 import '../models/game_save.dart';
 import '../models/team.dart';
 import 'secretary_screen.dart';
+import 'staff_screen.dart';
 import 'youth_academy_screen.dart';
 import 'trophy_room_screen.dart';
 
@@ -107,32 +109,59 @@ class _ClubManagementScreenState extends State<ClubManagementScreen> with Single
           _buildAcceptOfferSection(),
           const SizedBox(height: 24),
           
-          // Bloque del StreamBuilder para el cuerpo técnico
-          StreamBuilder<GameSave?>(
-            stream: widget.dbService.isar.gameSaves.watchObject(1, fireImmediately: true),
-            builder: (context, snapshot) {
-              final save = snapshot.data;
+          // Bloque del StreamBuilder para el cuerpo técnico con lógica de verificación
+          FutureBuilder<void>(
+            future: StaffService(widget.dbService.isar).syncGameSave(),
+            builder: (context, _) {
+              return StreamBuilder<GameSave?>(
+                stream: widget.dbService.isar.gameSaves.watchObject(1, fireImmediately: true),
+                builder: (context, snapshot) {
+                  final save = snapshot.data;
+                  return FutureBuilder<Map<String, bool>>(
+                    future: _hiredRoles(),
+                    builder: (context, hiredSnap) {
+                      final hired = hiredSnap.data ?? {};
+                      final hasCoach = hired['coach'] == true;
+                      final hasAssistant = hired['assistant'] == true;
+                      final hasPhysio = hired['physio'] == true;
 
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildMenuSection("CUERPO TÉCNICO"),
-                  _buildStaffTile(
-                    "SECRETARIO TÉCNICO",
-                    save?.staffSecretaryName ?? "—",
-                    save != null ? "⭐" * save.staffSecretaryLevel : "—",
-                  ),
-                  _buildStaffTile(
-                    "PREPARADOR FÍSICO",
-                    save?.staffPreparatorName ?? "—",
-                    save != null ? "⭐" * save.staffPreparatorLevel : "—",
-                  ),
-                  _buildStaffTile(
-                    "JEFE DE MÉDICOS",
-                    save?.staffMedicoName ?? "—",
-                    save != null ? "⭐" * save.staffMedicoLevel : "—",
-                  ),
-                ],
+                      if (!hasCoach && !hasAssistant && !hasPhysio) {
+                        return _buildEmptyStaffCTA();
+                      }
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildMenuSection("CUERPO TÉCNICO"),
+                          if (hasCoach)
+                            _buildStaffTile(
+                              "SECRETARIO TÉCNICO",
+                              save?.staffSecretaryName ?? "—",
+                              save != null && save.staffSecretaryLevel > 0
+                                  ? "⭐" * save.staffSecretaryLevel
+                                  : "—",
+                            ),
+                          if (hasAssistant)
+                            _buildStaffTile(
+                              "PREPARADOR FÍSICO",
+                              save?.staffPreparatorName ?? "—",
+                              save != null && save.staffPreparatorLevel > 0
+                                  ? "⭐" * save.staffPreparatorLevel
+                                  : "—",
+                            ),
+                          if (hasPhysio)
+                            _buildStaffTile(
+                              "JEFE DE MÉDICOS",
+                              save?.staffMedicoName ?? "—",
+                              save != null && save.staffMedicoLevel > 0
+                                  ? "⭐" * save.staffMedicoLevel
+                                  : "—",
+                            ),
+                        ],
+                      );
+                    },
+                  );
+                },
               );
             },
           ),
@@ -183,10 +212,64 @@ class _ClubManagementScreenState extends State<ClubManagementScreen> with Single
     );
   }
 
+  Widget _buildEmptyStaffCTA() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFDEFF9A).withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          const Icon(FontAwesomeIcons.userTie, color: Color(0xFFDEFF9A), size: 40),
+          const SizedBox(height: 16),
+          const Text(
+            "CUERPO TÉCNICO VACANTE",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "No hay personal contratado. Ve a Staff para fichar secretario, preparador y médico.",
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white54, fontSize: 13),
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => StaffScreen(dbService: widget.dbService, team: widget.team),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFDEFF9A),
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text("IR A STAFF", style: TextStyle(fontWeight: FontWeight.w900)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<Map<String, bool>> _hiredRoles() async {
+    final staff = StaffService(widget.dbService.isar);
+    return {
+      'coach': (await staff.getByRole('coach')) != null,
+      'assistant': (await staff.getByRole('assistant')) != null,
+      'physio': (await staff.getByRole('physio')) != null,
+    };
+  }
+
   Widget _buildFlippableClubCard() {
     return GestureDetector(
       onTap: _toggleCard,
-      behavior: HitTestBehavior.opaque, // Fuerza a que toda el área reciba el toque
+      behavior: HitTestBehavior.opaque,
       child: AnimatedBuilder(
         animation: _flipController,
         builder: (context, child) {
@@ -195,13 +278,13 @@ class _ClubManagementScreenState extends State<ClubManagementScreen> with Single
 
           return Transform(
             transform: Matrix4.identity()
-              ..setEntry(3, 2, 0.0015) // Perspectiva 3D
+              ..setEntry(3, 2, 0.0015)
               ..rotateY(transformValue),
             alignment: Alignment.center,
             child: isBack
                 ? Transform(
                     alignment: Alignment.center,
-                    transform: Matrix4.identity()..rotateY(pi), // Corrige efecto espejo
+                    transform: Matrix4.identity()..rotateY(pi),
                     child: _buildCardBack(),
                   )
                 : _buildCardFront(),

@@ -49,4 +49,10 @@ class GameSave {
 
   /// Día dentro de la semana de competición (1-7). El partido suele ser día 7.
   int currentDay = 1;
+
+  /// Confianza de la directiva (0–100), revisada al cerrar cada jornada.
+  int boardAcceptance = 75;
+
+  /// Último informe del presidente tras cerrar jornada.
+  late String boardLastFeedback;
 }

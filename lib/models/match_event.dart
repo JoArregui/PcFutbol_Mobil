@@ -8,6 +8,7 @@ class MatchEvent {
   final int? homeScore;
   final int? awayScore;
   final bool isFullTime;
+  final bool isHalftime;
   final int? playerId;
   final bool cardIsRed;
   final int injuryDays;
@@ -20,6 +21,7 @@ class MatchEvent {
     this.homeScore,
     this.awayScore,
     this.isFullTime = false,
+    this.isHalftime = false,
     this.playerId,
     this.cardIsRed = false,
     this.injuryDays = 0,

@@ -24,12 +24,19 @@ class SponsorContract {
   String toRawString() => "$brand|$vallasCount|$incomePerMatch|$remainingWeeks";
 
   factory SponsorContract.fromRawString(String raw) {
+    // CORRECCIÓN: Manejo defensivo para evitar RangeError si el string es inválido
     final parts = raw.split('|');
+    
+    // Si la cadena está corrupta, devolvemos un objeto de seguridad
+    if (parts.length < 4) {
+      return SponsorContract(brand: "INVALID", vallasCount: 0, incomePerMatch: 0, remainingWeeks: 0);
+    }
+
     return SponsorContract(
       brand: parts[0],
-      vallasCount: int.parse(parts[1]),
-      incomePerMatch: double.parse(parts[2]),
-      remainingWeeks: int.parse(parts[3]),
+      vallasCount: int.tryParse(parts[1]) ?? 0,
+      incomePerMatch: double.tryParse(parts[2]) ?? 0.0,
+      remainingWeeks: int.tryParse(parts[3]) ?? 0,
     );
   }
 }
@@ -48,9 +55,7 @@ class _StadiumScreenState extends State<StadiumScreen> {
   int _effectiveCapacity = 0;
   List<SponsorContract> _marketOffers = [];
 
-  // Estado del césped por defecto (si Isar no tuviera campo específico, lo manejamos localmente)
-  // NOTA: Para producción, lo ideal es mapear esto a un campo `f.pitchCondition` en Isar.
-  // Como fallback temporal simulado que persiste durante la sesión, usamos esta variable:
+  // Estado del césped por defecto
   int _pitchCondition = 100; 
 
   static const int maxVallasLargo = 20; // Sectores Laterales
@@ -80,7 +85,6 @@ class _StadiumScreenState extends State<StadiumScreen> {
       final vallas = random.nextInt(11) + 5; // Entre 5 y 15 vallas
       final weeks = random.nextInt(17) + 4;   // Entre 4 y 20 semanas de duración
       
-      // El valor base por valla oscila aleatoriamente para obligar a calcular la mejor oferta
       final basePricePerValla = (random.nextInt(1500) + 1500).toDouble(); // 1500€ - 3000€
       final totalIncome = vallas * basePricePerValla;
 
@@ -96,7 +100,12 @@ class _StadiumScreenState extends State<StadiumScreen> {
   // Parseadores helpers de persistencia para Isar
   List<SponsorContract> _parseContracts(String raw) {
     if (raw.isEmpty) return [];
-    return raw.split(',').where((e) => e.isNotEmpty).map((e) => SponsorContract.fromRawString(e)).toList();
+    // CORRECCIÓN: Filtramos los objetos marcados como INVALID
+    return raw.split(',')
+        .where((e) => e.isNotEmpty)
+        .map((e) => SponsorContract.fromRawString(e))
+        .where((c) => c.brand != "INVALID")
+        .toList();
   }
 
   String _serializeContracts(List<SponsorContract> contracts) {
@@ -118,17 +127,14 @@ class _StadiumScreenState extends State<StadiumScreen> {
 
   /// Realiza la transacción económica para cambiar el césped deteriorado
   Future<void> _replantarCesped(ClubFinance f) async {
-    // Verificamos si hay fondos suficientes (Usamos f.balance o el campo de presupuesto de tu modelo)
-    // Suponiendo que f.balance contiene el dinero total actual del club:
-    if ((f.balance ?? 0) < costReplantar) {
+    if (f.balance < costReplantar) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Fondos insuficientes para replantar el césped (Necesitas 250.000 €).')),
       );
       return;
     }
 
-    // Descontar presupuesto y resetear el césped
-    f.balance = (f.balance ?? 0) - costReplantar;
+    f.balance = f.balance - costReplantar;
     
     await widget.dbService.isar.writeTxn(() => widget.dbService.isar.clubFinances.put(f));
     
@@ -177,7 +183,7 @@ class _StadiumScreenState extends State<StadiumScreen> {
                 _buildStadiumVisual(pitch['label'], pitch['color']),
                 const SizedBox(height: 12),
                 
-                // Botón dinámico de mantenimiento del césped (Solo aparece si se ha desgastado)
+                // Botón dinámico de mantenimiento del césped
                 if (_pitchCondition < 100) ...[
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
@@ -364,7 +370,6 @@ class _StadiumScreenState extends State<StadiumScreen> {
     );
   }
 
-  /// Despliega el mercado de ofertas dinámicas calculadas en tiempo real
   Future<void> _showMarketNegotiation(BuildContext context, ClubFinance f, int slot, int espacioDisponible) async {
     final picked = await showModalBottomSheet<SponsorContract>(
       context: context,
@@ -449,28 +454,23 @@ class _StadiumScreenState extends State<StadiumScreen> {
     
     await widget.dbService.isar.writeTxn(() => widget.dbService.isar.clubFinances.put(f));
     setState(() {
-      _marketOffers.remove(picked); // Quitar oferta del mercado una vez aceptada
+      _marketOffers.remove(picked);
     });
   }
 
-  /// Método de simulación para avanzar cronológicamente el fin de semana del gestor.
-  /// Reduce el tiempo de vida de los contratos y además DEGRADARÁ EL CÉSPED.
   Future<void> _simulateWeekElapsed(ClubFinance f) async {
     List<SponsorContract> s1 = _parseContracts(f.sponsorSlot1Brand);
     List<SponsorContract> s2 = _parseContracts(f.sponsorSlot2Brand);
     List<SponsorContract> s3 = _parseContracts(f.sponsorSlot3Brand);
 
-    // Decrementar semanas
     for (var c in s1) { c.remainingWeeks--; }
     for (var c in s2) { c.remainingWeeks--; }
     for (var c in s3) { c.remainingWeeks--; }
 
-    // Filtrar contratos que ya expiraron
     s1.removeWhere((c) => c.remainingWeeks <= 0);
     s2.removeWhere((c) => c.remainingWeeks <= 0);
     s3.removeWhere((c) => c.remainingWeeks <= 0);
 
-    // Recalcular ingresos por bloque
     f.sponsorSlot1Brand = _serializeContracts(s1);
     f.sponsorSlot1Income = s1.fold(0, (sum, c) => sum + c.incomePerMatch);
 
@@ -483,9 +483,8 @@ class _StadiumScreenState extends State<StadiumScreen> {
     f.sponsorIncomePerMatch = f.sponsorSlot1Income + f.sponsorSlot2Income + f.sponsorSlot3Income;
 
     await widget.dbService.isar.writeTxn(() => widget.dbService.isar.clubFinances.put(f));
-    _generateMarketOffers(); // El mercado cambia completamente al iniciar nueva semana
+    _generateMarketOffers(); 
     
-    // MODIFICACIÓN: Deterioro aleatorio del césped entre 4% y 9% por semana simulada.
     final random = Random();
     final desgaste = random.nextInt(6) + 4; 
 

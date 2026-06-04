@@ -1,15 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 import '../models/player_model.dart';
-import '../models/team.dart';
-import '../models/game_save.dart';
 import 'api_service.dart';
 import 'database_service.dart';
 import 'player_generator.dart';
 import 'dart:math' as math;
 
 /// Garantiza plantilla por equipo: API + relleno inventado progresivo.
-/// Setea las condiciones de inicio respetando un mínimo del 70% de jugadores reales.
+/// Jornada 1: mínimo 70% reales / máximo 30% generados. Desde jornada 2: libertad total en el usuario.
 class SquadService {
   final Isar isar;
   final ApiService _api = ApiService();
@@ -20,13 +18,20 @@ class SquadService {
 
   static const minSquadSize = 20;
   static const preferredSquadSize = 24;
-  
-  /// Regla de Oro para la generación inicial: Máximo 30% de jugadores inventados.
-  static const maxGeneratedRatio = 0.30; 
+  static const minRealRatio = 0.70;
+  static const maxGeneratedRatio = 0.30;
+
+  Future<bool> _enforceInitialRatio(int teamApiId) async {
+    final save = await isar.gameSaves.get(1);
+    if (save == null) return true;
+    if (save.userTeamApiId != teamApiId) return true;
+    return save.currentMatchday <= 1;
+  }
 
   Future<List<Player>> ensureSquad(int teamApiId, {bool tryApiFirst = true}) async {
     var players = await isar.players.filter().teamApiIdEqualTo(teamApiId).findAll();
     final season = await _currentSeason();
+    final enforceRatio = await _enforceInitialRatio(teamApiId);
 
     if (players.length < minSquadSize && tryApiFirst) {
       debugPrint('📥 Descargando plantilla API para equipo $teamApiId…');
@@ -34,69 +39,126 @@ class SquadService {
       players = await isar.players.filter().teamApiIdEqualTo(teamApiId).findAll();
     }
 
-    // Contamos los reales profesionales activos, ya que los canteranos no forman 
-    // parte del primer equipo visible en el SquadScreen de inicio.
-    final realCount = players.where((p) => !p.isGenerated && !p.isYouth).length;
-    final generatedCount = players.length - players.where((p) => !p.isGenerated).length;
-    
-    // El ratio se ajusta por temporada del juego para la CPU, limitado por el tope de inicio.
-    final double seasonRatio = math.min(_generatedRatioForSeason(season), maxGeneratedRatio);
-    final maxGeneratedBySeason = (preferredSquadSize * seasonRatio).floor();
-
-    final desiredGenerated = _desiredGeneratedCount(
-      realCount: realCount,
-      currentGenerated: generatedCount,
-      maxGeneratedBySeason: maxGeneratedBySeason,
+    players = await _applyPositionalRequirements(
+      teamApiId,
+      players,
+      season,
+      enforceRatio: enforceRatio,
     );
 
-    final int lowerLimit = math.min(minSquadSize, preferredSquadSize);
-    final int upperLimit = math.max(minSquadSize, preferredSquadSize);
-    final desiredTotal = (realCount + desiredGenerated).clamp(lowerLimit, upperLimit);
-    
+    if (enforceRatio) {
+      players = await _trimExcessGenerated(teamApiId, players);
+    }
+
+    final realCount = players.where((p) => !p.isGenerated && !p.isYouth).length;
+    final generatedCount = players.where((p) => p.isGenerated).length;
+
+    int desiredGenerated = 0;
+    if (enforceRatio) {
+      final maxAllowedGenerated =
+          (realCount * (maxGeneratedRatio / (1 - maxGeneratedRatio))).ceil();
+      desiredGenerated = math.min(
+        maxAllowedGenerated,
+        math.max(0, preferredSquadSize - realCount - generatedCount),
+      );
+    } else {
+      desiredGenerated = math.max(0, preferredSquadSize - players.where((p) => !p.isYouth).length);
+    }
+
+    final lowerLimit = math.min(minSquadSize, preferredSquadSize);
+    final upperLimit = math.max(minSquadSize, preferredSquadSize);
+    final desiredTotal = (realCount + generatedCount + desiredGenerated).clamp(lowerLimit, upperLimit);
     final needed = desiredTotal - players.length;
 
     if (needed > 0) {
-      final generated = PlayerGenerator.generateSupplementalPlayers(
-        teamApiId,
-        needed,
-        seasonNumber: season,
-      );
-      players = [...players, ...generated];
-      await _replaceSquad(teamApiId, players);
+      final toGenerate = enforceRatio
+          ? math.min(needed, math.max(0, (realCount * (maxGeneratedRatio / (1 - maxGeneratedRatio))).ceil() - generatedCount))
+          : needed;
+      if (toGenerate > 0) {
+        final generated = PlayerGenerator.generateSupplementalPlayers(
+          teamApiId,
+          toGenerate,
+          seasonNumber: season,
+        );
+        players = [...players, ...generated];
+        await _replaceSquad(teamApiId, players);
+      }
+    }
+
+    if (enforceRatio) {
+      players = await _trimExcessGenerated(teamApiId, players);
+      players = await isar.players.filter().teamApiIdEqualTo(teamApiId).findAll();
     }
 
     final finalReal = players.where((p) => !p.isGenerated && !p.isYouth).length;
     final finalTotal = players.where((p) => !p.isYouth).length;
     final finalPct = finalTotal == 0 ? 0 : (finalReal * 100 / finalTotal);
-    debugPrint('📊 Equipo $teamApiId real profesional local: $finalReal/$finalTotal (${finalPct.toStringAsFixed(1)}%)');
+    debugPrint(
+      '📊 Equipo $teamApiId: $finalReal/$finalTotal reales (${finalPct.toStringAsFixed(1)}%)'
+      '${enforceRatio ? " [70/30]" : " [libre]"}',
+    );
 
     return players;
   }
 
-  int _desiredGeneratedCount({
-    required int realCount,
-    required int currentGenerated,
-    required int maxGeneratedBySeason,
-  }) {
-    // Si la API no responde o hay escasez crítica de reales en la base de datos de origen:
-    if (realCount < minSquadSize) {
-      final maxAllowedGenerated = (preferredSquadSize * maxGeneratedRatio).floor();
-      final neededForPlayable = math.min(minSquadSize - realCount, maxAllowedGenerated);
-      
-      final int minLimit = math.min(currentGenerated, maxAllowedGenerated);
-      final int maxLimit = math.max(currentGenerated, maxAllowedGenerated);
-      
-      return neededForPlayable.clamp(minLimit, maxLimit);
+  Future<List<Player>> _trimExcessGenerated(int teamApiId, List<Player> players) async {
+    final pros = players.where((p) => !p.isYouth).toList();
+    var real = pros.where((p) => !p.isGenerated).length;
+    var gen = pros.where((p) => p.isGenerated).toList();
+    final total = real + gen.length;
+    if (total == 0) return players;
+
+    final maxGen = (real * (maxGeneratedRatio / (1 - maxGeneratedRatio))).floor();
+    if (gen.length > maxGen) {
+      gen.sort((a, b) => a.average.compareTo(b.average));
+      final removeCount = gen.length - maxGen;
+      final removeIds = gen.take(removeCount).map((p) => p.id).toSet();
+      players = players.where((p) => !removeIds.contains(p.id)).toList();
+      await _replaceSquad(teamApiId, players);
     }
 
-    return currentGenerated > maxGeneratedBySeason ? currentGenerated : maxGeneratedBySeason;
+    final prosAfter = players.where((p) => !p.isYouth).toList();
+    real = prosAfter.where((p) => !p.isGenerated).length;
+    final minReal = (prosAfter.length * minRealRatio).ceil();
+    if (real < minReal) {
+      debugPrint('⚠️ Equipo $teamApiId: solo $real reales (${(real * 100 / pros.length).toStringAsFixed(0)}%), se intentará más API en próxima sync.');
+    }
+
+    return players;
   }
 
-  double _generatedRatioForSeason(int season) {
-    if (season <= 1) return 0.15; // 85% real objetivo
-    if (season == 2) return 0.22; // 78% real objetivo
-    if (season == 3) return 0.28; // 72% real objetivo
-    return maxGeneratedRatio;     // 0.30 -> Límite absoluto del 30% de inventados
+  Future<List<Player>> _applyPositionalRequirements(
+    int teamApiId,
+    List<Player> players,
+    int season, {
+    required bool enforceRatio,
+  }) async {
+    const requiredPositions = {'GK': 2, 'DEF': 5, 'MID': 5, 'FWD': 5};
+    final additions = <Player>[];
+
+    for (final entry in requiredPositions.entries) {
+      final pos = entry.key;
+      final min = entry.value;
+      final current = players.where((p) => p.position == pos && !p.isYouth).length;
+      if (current < min) {
+        var needed = min - current;
+        if (enforceRatio) {
+          final real = players.where((p) => !p.isGenerated && !p.isYouth).length;
+          final gen = players.where((p) => p.isGenerated).length;
+          final maxGen = (real * (maxGeneratedRatio / (1 - maxGeneratedRatio))).ceil();
+          needed = math.min(needed, math.max(0, maxGen - gen));
+        }
+        for (var i = 0; i < needed; i++) {
+          additions.add(PlayerGenerator.generateSpecificPosition(teamApiId, pos, season));
+        }
+      }
+    }
+
+    if (additions.isNotEmpty) {
+      players = [...players, ...additions];
+      await _replaceSquad(teamApiId, players);
+    }
+    return players;
   }
 
   Future<int> _currentSeason() async {

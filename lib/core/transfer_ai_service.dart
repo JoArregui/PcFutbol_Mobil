@@ -2,8 +2,6 @@ import 'dart:math';
 import 'package:isar/isar.dart';
 import '../models/player_model.dart';
 import '../models/transfer_offer.dart';
-import '../models/finance_model.dart';
-import '../models/game_save.dart';
 import '../models/team.dart';
 import '../models/game_message.dart';
 import 'message_service.dart';
@@ -19,12 +17,18 @@ class TransferAiService {
   int _prestige(String name) {
     final n = name.toLowerCase();
     if (n.contains('madrid') || n.contains('barcelona') || n.contains('city') ||
-        n.contains('united') || n.contains('psg') || n.contains('bayern')) return 3;
+        n.contains('united') || n.contains('psg') || n.contains('bayern')) {
+      return 3;
+    }
     if (n.contains('atlético') || n.contains('atletico') || n.contains('sevilla') ||
         n.contains('liverpool') || n.contains('arsenal') || n.contains('chelsea') ||
-        n.contains('juventus') || n.contains('milan') || n.contains('inter')) return 2;
+        n.contains('juventus') || n.contains('milan') || n.contains('inter')) {
+      return 2;
+    }
     if (n.contains('valencia') || n.contains('betis') || n.contains('sociedad') ||
-        n.contains('villarreal') || n.contains('napoli') || n.contains('roma')) return 1;
+        n.contains('villarreal') || n.contains('napoli') || n.contains('roma')) {
+      return 1;
+    }
     return 0;
   }
 
