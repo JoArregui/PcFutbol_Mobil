@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:isar/isar.dart';
 import '../core/database_service.dart';
 import '../core/game_session_service.dart';
 import '../models/league_standing.dart';

@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:isar/isar.dart';
 import '../models/player_model.dart';
+import '../models/game_save.dart';
 
 enum TrainingFocus { fitness, shooting, passing, defense, tactical }
 
@@ -36,14 +37,20 @@ class TrainingEngine {
   Map<String, dynamic> autoSelectConfiguration({
     required List<Player> teamPlayers,
     required int maxCupos,
+    required List<String> usedFocuses,
   }) {
     if (teamPlayers.isEmpty) {
       return {"focus": TrainingFocus.tactical, "playerIds": <int>[]};
     }
 
-    // 1. Elección de foco aleatorio de la semana
+    // 1. Elección de foco aleatorio, excluyendo los ya usados
     const foci = TrainingFocus.values;
-    final randomFocus = foci[_random.nextInt(foci.length)];
+    final availableFoci = foci.where((f) => !usedFocuses.contains(f.name)).toList();
+    
+    // Si todos los focos están usados, devolvemos uno cualquiera (el motor luego bloqueará el entrenamiento)
+    final randomFocus = availableFoci.isNotEmpty 
+        ? availableFoci[_random.nextInt(availableFoci.length)]
+        : foci[_random.nextInt(foci.length)];
 
     // 2. Ordenación lógica de jugadores por prioridad de desarrollo:
     // Prioriza Unicorns (estrellas), menores de 21 años, y jugadores con mayor margen respecto a su potencial
@@ -80,10 +87,24 @@ class TrainingEngine {
     };
   }
 
-  /// Entrena a los jugadores y devuelve un mapa detallado con la evolución de cada uno
-  Future<Map<int, TrainingResult>> trainSelectedPlayers(List<int> playerIds, TrainingFocus focus, {double staffMultiplier = 1.0}) async {
+  /// Entrena a los jugadores y devuelve un mapa detallado con la evolución de cada uno.
+  /// Si el foco ya fue usado hoy, devuelve un mapa vacío sin modificar nada.
+  Future<Map<int, TrainingResult>> trainSelectedPlayers(
+    List<int> playerIds,
+    TrainingFocus focus, {
+    double staffMultiplier = 1.0,
+  }) async {
     if (playerIds.isEmpty) return {};
-    
+
+    final save = await isar.gameSaves.get(1);
+    if (save == null) return {};
+
+    final focusKey = focus.name;
+    if (save.trainingFocusesUsedToday.contains(focusKey)) return {};
+
+    save.trainingFocusesUsedToday = [...save.trainingFocusesUsedToday, focusKey];
+    await isar.writeTxn(() => isar.gameSaves.put(save));
+
     final results = await isar.players.getAll(playerIds);
     final players = results.whereType<Player>().toList();
     final Map<int, TrainingResult> report = {};

@@ -1,16 +1,22 @@
 import 'package:isar/isar.dart';
+import '../models/cup_fixture.dart';
 import '../models/game_save.dart';
 import '../models/game_message.dart';
+import '../models/league_standing.dart';
+import '../models/player_model.dart';
 import '../models/staff_member.dart';
 import '../models/team.dart';
 import '../models/finance_model.dart';
 import '../models/league_fixture.dart';
+import '../models/transfer_offer.dart';
+import '../models/user_lineup.dart';
 import 'league_service.dart';
 import 'message_service.dart';
 import 'calendar_service.dart';
 import 'board_service.dart';
 import 'youth_service.dart';
 import 'squad_service.dart';
+import 'package:flutter/foundation.dart';
 
 class GameSessionService {
   final Isar isar;
@@ -143,8 +149,14 @@ class GameSessionService {
     );
   }
 
+  /* /// ===========================================================================
+  /// REINICIA TODO EL JUEGO:
+  /// - Borra TODOS los datos (partida, equipos, jugadores, finanzas...)
+  /// - Después, se volverá a sincronizar la API desde cero para datos frescos
+  /// ===========================================================================
   Future<void> resetCareer() async {
     await isar.writeTxn(() async {
+      // Datos de la partida
       await isar.gameSaves.clear();
       await isar.leagueFixtures.clear();
       await isar.leagueStandings.clear();
@@ -153,8 +165,14 @@ class GameSessionService {
       await isar.cupFixtures.clear();
       await isar.clubFinances.clear();
       await isar.transferOffers.clear();
+      
+      // 🔒 BORRAMOS TAMBIÉN EQUIPOS Y JUGADORES para volver a sincronizar desde API
+      await isar.teams.clear();
+      await isar.players.clear();
+      
+      debugPrint("🧹 CARRERA REINICIADA - TODOS los datos borrados.");
     });
-  }
+  } */
 
   /// Nueva temporada con el mismo club (modo Liga Manager PCF7).
   Future<void> startNextSeason(Team userTeam) async {

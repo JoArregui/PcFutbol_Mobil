@@ -1,6 +1,53 @@
 import 'package:isar/isar.dart';
+import '../core/tactics_service.dart';
 
 part 'game_save.g.dart';
+
+/// Plan de partido por fases (ajustes automáticos según el minuto)
+enum GamePhasePlan {
+  early,       // 0-30 min
+  mid,         // 31-60 min
+  late,        // 61-75 min
+  veryLate,    // 76-90 min
+  ifWinning,   // Si vamos ganando
+  ifLosing,    // Si vamos perdiendo
+  ifDrawing    // Si vamos empatando
+}
+
+/// Tipo de requerimiento de la directiva
+enum BoardRequirementType {
+  signPlayer,        // Fichar un jugador con características específicas
+  promoteYouth,      // Promover X canteranos al primer equipo
+  reachPosition,     // Alcanzar posición X en liga en jornada Y
+  winDerby,          // Ganar el derbi
+  keepCleanSheets,   // Mantener X porterías a cero
+  scoreGoals,        // Marcar X goles en Y partidos
+  developPlayer      // Mejorar un jugador específico
+}
+
+/// Requerimiento específico de la directiva
+@embedded
+class BoardRequirement {
+  @Enumerated(EnumType.name)
+  late BoardRequirementType type;
+  
+  late String description;
+  late int targetValue;
+  int currentValue = 0;
+  bool completed = false;
+  DateTime? deadline;
+  String? playerId;
+}
+
+/// Resultado de encuesta a la afición
+@embedded
+class FanSurvey {
+  late int approvalRating; // 0-100
+  late String favoritePlayer;
+  late String mostCriticizedPlayer;
+  late String feedback;
+  late DateTime surveyDate;
+}
 
 @collection
 class GameSave {
@@ -55,4 +102,62 @@ class GameSave {
 
   /// Último informe del presidente tras cerrar jornada.
   late String boardLastFeedback;
+
+  /// Acumulado histórico de jugadores `isGenerated` seleccionados
+  /// en todas las convocatorias guardadas por el usuario.
+  /// Sirve para decidir si la regla 70/30 debe seguir activa en
+  /// jornadas posteriores a la primera.
+  int lineupGeneratedPlayers = 0;
+
+  /// Total histórico de jugadores (titulares + suplentes) seleccionados
+  /// en todas las convocatorias guardadas por el usuario.
+  int lineupTotalPlayers = 0;
+
+  /// Focos de entrenamiento ya usados en el día actual.
+  /// Se resetea automáticamente al avanzar de día en CalendarService.
+  List<String> trainingFocusesUsedToday = [];
+
+  /// Mentalidad del equipo
+  @Enumerated(EnumType.name)
+  TeamMentality teamMentality = TeamMentality.balanced;
+
+  /// Intensidad del equipo
+  @Enumerated(EnumType.name)
+  TeamIntensity teamIntensity = TeamIntensity.normal;
+
+  /// Estilo de juego
+  @Enumerated(EnumType.name)
+  TeamStyle teamStyle = TeamStyle.possession;
+
+  // === NUEVOS CAMPOS PARA TÁCTICAS AVANZADAS ===
+
+  /// Plan de partido por fases (ajustes automáticos)
+  /// Mapa: phase -> (mentality, intensity, style)
+  List<String> phasePlans = [];
+
+  /// Formación principal por defecto
+  String defaultFormation = '4-4-2';
+
+  /// Si usar ajustes automáticos por fase
+  bool useAutomaticPhaseAdjustments = false;
+
+  // === NUEVOS CAMPOS PARA DIRECTIVA ===
+
+  /// Requerimientos específicos de la directiva
+  List<BoardRequirement> boardRequirements = [];
+
+  /// Última encuesta a la afición
+  FanSurvey? lastFanSurvey;
+
+  /// Fecha de la última encuesta
+  DateTime? lastSurveyDate;
+
+  /// Número de derbis ganados esta temporada
+  int derbiesWon = 0;
+
+  /// Número de porterías a cero esta temporada
+  int cleanSheets = 0;
+
+  /// Jugador estrella elegido por la afición
+  String? fanFavoritePlayerId;
 }

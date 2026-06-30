@@ -117,6 +117,7 @@ class _TransferOffersScreenState extends State<TransferOffersScreen> {
           OfferType.purchase => 'COMPRA',
           OfferType.loanIn => 'CESIÓN ENTRANTE',
           OfferType.loanOut => 'CESIÓN SALIDA',
+          OfferType.swap => 'INTERCAMBIO',
         };
         return FutureBuilder<GameSave?>(
           future: saveFuture,

@@ -2,6 +2,7 @@ import 'dart:math';
 import '../models/match_event.dart';
 import '../models/player_model.dart';
 import '../models/team.dart';
+import '../models/match_stats.dart';
 import 'tactics_service.dart';
 
 /// Motor de partido estilo PC Fútbol 7: resumen por escrito con goles, tarjetas y lesiones.
@@ -283,5 +284,147 @@ class MatchEngine {
     final forwards = players.where((p) => p.position == 'FWD').toList();
     final pool = forwards.isNotEmpty ? forwards : players;
     return pool[_rng.nextInt(pool.length)];
+  }
+
+  /// Genera estadísticas completas del partido (Hoja de partido estilo PC Fútbol 7)
+  FullMatchStats generateFullStats({
+    required List<MatchEvent> events,
+    required List<Player> homePlayers,
+    required List<Player> awayPlayers,
+  }) {
+    // Inicializar stats de jugadores
+    final homeStats = homePlayers.map((p) => PlayerMatchStats(
+      playerId: p.id,
+      playerName: p.name,
+      position: p.position,
+      minutesPlayed: 90,
+      rating: 5.0 + _rng.nextDouble() * 4.0,
+    )).toList();
+
+    final awayStats = awayPlayers.map((p) => PlayerMatchStats(
+      playerId: p.id,
+      playerName: p.name,
+      position: p.position,
+      minutesPlayed: 90,
+      rating: 5.0 + _rng.nextDouble() * 4.0,
+    )).toList();
+
+    int homeGoals = 0;
+    int awayGoals = 0;
+    int homeShots = 0;
+    int awayShots = 0;
+    int homeShotsOnTarget = 0;
+    int awayShotsOnTarget = 0;
+    int homeCorners = 0;
+    int awayCorners = 0;
+    int homeFouls = 0;
+    int awayFouls = 0;
+    int homeYellowCards = 0;
+    int awayYellowCards = 0;
+    int homeRedCards = 0;
+    int awayRedCards = 0;
+
+    // Procesar eventos
+    for (final event in events) {
+      // Actualizar stats de equipo
+      if (event.type == EventType.goal) {
+        if (event.isHomeTeam == true) {
+          homeGoals = event.homeScore ?? homeGoals;
+          homeShots++;
+          homeShotsOnTarget++;
+        } else {
+          awayGoals = event.awayScore ?? awayGoals;
+          awayShots++;
+          awayShotsOnTarget++;
+        }
+
+        // Actualizar stats del jugador
+        if (event.isHomeTeam == true) {
+          final idx = homeStats.indexWhere((s) => s.playerId == event.playerId);
+          if (idx != -1) {
+            homeStats[idx] = homeStats[idx].copyWith(
+              goals: homeStats[idx].goals + 1,
+              shotsOnTarget: homeStats[idx].shotsOnTarget + 1,
+              rating: (homeStats[idx].rating + 1.0).clamp(0.0, 10.0),
+            );
+          }
+        } else {
+          final idx = awayStats.indexWhere((s) => s.playerId == event.playerId);
+          if (idx != -1) {
+            awayStats[idx] = awayStats[idx].copyWith(
+              goals: awayStats[idx].goals + 1,
+              shotsOnTarget: awayStats[idx].shotsOnTarget + 1,
+              rating: (awayStats[idx].rating + 1.0).clamp(0.0, 10.0),
+            );
+          }
+        }
+      }
+
+      if (event.type == EventType.card) {
+        if (event.isHomeTeam == true) {
+          if (event.cardIsRed == true) {
+            homeRedCards++;
+          } else {
+            homeYellowCards++;
+          }
+          homeFouls++;
+        } else {
+          if (event.cardIsRed == true) {
+            awayRedCards++;
+          } else {
+            awayYellowCards++;
+          }
+          awayFouls++;
+        }
+
+        // Actualizar stats del jugador
+        if (event.isHomeTeam == true) {
+          final idx = homeStats.indexWhere((s) => s.playerId == event.playerId);
+          if (idx != -1) {
+            homeStats[idx] = homeStats[idx].copyWith(
+              yellowCards: event.cardIsRed == true ? homeStats[idx].yellowCards : homeStats[idx].yellowCards + 1,
+              redCard: event.cardIsRed == true ? true : homeStats[idx].redCard,
+            );
+          }
+        } else {
+          final idx = awayStats.indexWhere((s) => s.playerId == event.playerId);
+          if (idx != -1) {
+            awayStats[idx] = awayStats[idx].copyWith(
+              yellowCards: event.cardIsRed == true ? awayStats[idx].yellowCards : awayStats[idx].yellowCards + 1,
+              redCard: event.cardIsRed == true ? true : awayStats[idx].redCard,
+            );
+          }
+        }
+      }
+
+      if (event.type == EventType.chance) {
+        if (_rng.nextBool()) {
+          homeShots++;
+          if (_rng.nextBool()) homeCorners++;
+        } else {
+          awayShots++;
+          if (_rng.nextBool()) awayCorners++;
+        }
+      }
+    }
+
+    return FullMatchStats(
+      homeGoals: homeGoals,
+      awayGoals: awayGoals,
+      homeShots: homeShots,
+      awayShots: awayShots,
+      homeShotsOnTarget: homeShotsOnTarget,
+      awayShotsOnTarget: awayShotsOnTarget,
+      homeCorners: homeCorners,
+      awayCorners: awayCorners,
+      homeFouls: homeFouls,
+      awayFouls: awayFouls,
+      homeYellowCards: homeYellowCards,
+      awayYellowCards: awayYellowCards,
+      homeRedCards: homeRedCards,
+      awayRedCards: awayRedCards,
+      homePlayerStats: homeStats,
+      awayPlayerStats: awayStats,
+    );
   }
 }

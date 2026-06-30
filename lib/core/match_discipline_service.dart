@@ -12,7 +12,7 @@ class MatchDisciplineService {
     final toUpdate = <Player>[];
 
     for (final e in events) {
-      if (e.playerId == null) continue;
+      if (e.playerId == null || e.playerId! <= 0) continue; 
       final p = await isar.players.get(e.playerId!);
       if (p == null || p.teamApiId != userTeamApiId) continue;
 

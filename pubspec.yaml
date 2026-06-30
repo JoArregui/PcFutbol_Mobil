@@ -10,15 +10,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
+
   cupertino_icons: ^1.0.6
   font_awesome_flutter: ^10.7.0
 
-  isar: ^3.1.0
-  isar_flutter_libs: ^3.1.0
+  isar: ^3.1.0+1
+  isar_flutter_libs: ^3.1.0+1
 
   path_provider: ^2.1.2
-  
+
   google_fonts: ^6.1.0
   intl: ^0.19.0
   http: ^1.6.0
@@ -28,10 +28,11 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
 
-  isar_generator: ^3.1.0
-  build_runner: ^2.4.8
+  isar_generator: ^3.1.0+1
+  build_runner: ^2.4.13
 
   flutter_lints: ^3.0.1
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -49,3 +50,16 @@ flutter:
   #       - asset: assets/fonts/Urbanist-Regular.ttf
   #       - asset: assets/fonts/Urbanist-Bold.ttf
   #         weight: 700
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+
+  image_path: "assets/icons/PcFutbol26.png"
+
+  min_sdk_android: 21
+
+  adaptive_icon_background: "#0B1220"
+  adaptive_icon_foreground: "assets/icons/PcFutbol26.png"
+
+  remove_alpha_ios: true

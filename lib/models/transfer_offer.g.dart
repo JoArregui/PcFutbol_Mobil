@@ -22,52 +22,97 @@ const TransferOfferSchema = CollectionSchema(
       name: r'amount',
       type: IsarType.double,
     ),
-    r'counterpartyTeamApiId': PropertySchema(
+    r'buybackClause': PropertySchema(
       id: 1,
+      name: r'buybackClause',
+      type: IsarType.double,
+    ),
+    r'buybackValidYears': PropertySchema(
+      id: 2,
+      name: r'buybackValidYears',
+      type: IsarType.long,
+    ),
+    r'counterpartyTeamApiId': PropertySchema(
+      id: 3,
       name: r'counterpartyTeamApiId',
       type: IsarType.long,
     ),
     r'counterpartyTeamName': PropertySchema(
-      id: 2,
+      id: 4,
       name: r'counterpartyTeamName',
       type: IsarType.string,
     ),
     r'createdAt': PropertySchema(
-      id: 3,
+      id: 5,
       name: r'createdAt',
       type: IsarType.dateTime,
     ),
     r'expiresOnMatchday': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'expiresOnMatchday',
       type: IsarType.long,
     ),
     r'isForOurPlayer': PropertySchema(
-      id: 5,
+      id: 7,
       name: r'isForOurPlayer',
       type: IsarType.bool,
     ),
     r'loanMatchdays': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'loanMatchdays',
       type: IsarType.long,
     ),
+    r'loanPurchaseOptionAmount': PropertySchema(
+      id: 9,
+      name: r'loanPurchaseOptionAmount',
+      type: IsarType.double,
+    ),
+    r'loanWithPurchaseOption': PropertySchema(
+      id: 10,
+      name: r'loanWithPurchaseOption',
+      type: IsarType.bool,
+    ),
+    r'negotiationRounds': PropertySchema(
+      id: 11,
+      name: r'negotiationRounds',
+      type: IsarType.long,
+    ),
     r'offerType': PropertySchema(
-      id: 7,
+      id: 12,
       name: r'offerType',
       type: IsarType.byte,
       enumMap: _TransferOfferofferTypeEnumValueMap,
     ),
     r'playerId': PropertySchema(
-      id: 8,
+      id: 13,
       name: r'playerId',
       type: IsarType.long,
     ),
+    r'previousOffers': PropertySchema(
+      id: 14,
+      name: r'previousOffers',
+      type: IsarType.doubleList,
+    ),
+    r'sellOnPercentage': PropertySchema(
+      id: 15,
+      name: r'sellOnPercentage',
+      type: IsarType.double,
+    ),
     r'status': PropertySchema(
-      id: 9,
+      id: 16,
       name: r'status',
       type: IsarType.byte,
       enumMap: _TransferOfferstatusEnumValueMap,
+    ),
+    r'swapPlayerId': PropertySchema(
+      id: 17,
+      name: r'swapPlayerId',
+      type: IsarType.long,
+    ),
+    r'swapPlayerName': PropertySchema(
+      id: 18,
+      name: r'swapPlayerName',
+      type: IsarType.string,
     )
   },
   estimateSize: _transferOfferEstimateSize,
@@ -91,6 +136,13 @@ int _transferOfferEstimateSize(
 ) {
   var bytesCount = offsets.last;
   bytesCount += 3 + object.counterpartyTeamName.length * 3;
+  bytesCount += 3 + object.previousOffers.length * 8;
+  {
+    final value = object.swapPlayerName;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   return bytesCount;
 }
 
@@ -101,15 +153,24 @@ void _transferOfferSerialize(
   Map<Type, List<int>> allOffsets,
 ) {
   writer.writeDouble(offsets[0], object.amount);
-  writer.writeLong(offsets[1], object.counterpartyTeamApiId);
-  writer.writeString(offsets[2], object.counterpartyTeamName);
-  writer.writeDateTime(offsets[3], object.createdAt);
-  writer.writeLong(offsets[4], object.expiresOnMatchday);
-  writer.writeBool(offsets[5], object.isForOurPlayer);
-  writer.writeLong(offsets[6], object.loanMatchdays);
-  writer.writeByte(offsets[7], object.offerType.index);
-  writer.writeLong(offsets[8], object.playerId);
-  writer.writeByte(offsets[9], object.status.index);
+  writer.writeDouble(offsets[1], object.buybackClause);
+  writer.writeLong(offsets[2], object.buybackValidYears);
+  writer.writeLong(offsets[3], object.counterpartyTeamApiId);
+  writer.writeString(offsets[4], object.counterpartyTeamName);
+  writer.writeDateTime(offsets[5], object.createdAt);
+  writer.writeLong(offsets[6], object.expiresOnMatchday);
+  writer.writeBool(offsets[7], object.isForOurPlayer);
+  writer.writeLong(offsets[8], object.loanMatchdays);
+  writer.writeDouble(offsets[9], object.loanPurchaseOptionAmount);
+  writer.writeBool(offsets[10], object.loanWithPurchaseOption);
+  writer.writeLong(offsets[11], object.negotiationRounds);
+  writer.writeByte(offsets[12], object.offerType.index);
+  writer.writeLong(offsets[13], object.playerId);
+  writer.writeDoubleList(offsets[14], object.previousOffers);
+  writer.writeDouble(offsets[15], object.sellOnPercentage);
+  writer.writeByte(offsets[16], object.status.index);
+  writer.writeLong(offsets[17], object.swapPlayerId);
+  writer.writeString(offsets[18], object.swapPlayerName);
 }
 
 TransferOffer _transferOfferDeserialize(
@@ -120,20 +181,29 @@ TransferOffer _transferOfferDeserialize(
 ) {
   final object = TransferOffer();
   object.amount = reader.readDouble(offsets[0]);
-  object.counterpartyTeamApiId = reader.readLong(offsets[1]);
-  object.counterpartyTeamName = reader.readString(offsets[2]);
-  object.createdAt = reader.readDateTime(offsets[3]);
-  object.expiresOnMatchday = reader.readLong(offsets[4]);
+  object.buybackClause = reader.readDoubleOrNull(offsets[1]);
+  object.buybackValidYears = reader.readLongOrNull(offsets[2]);
+  object.counterpartyTeamApiId = reader.readLong(offsets[3]);
+  object.counterpartyTeamName = reader.readString(offsets[4]);
+  object.createdAt = reader.readDateTime(offsets[5]);
+  object.expiresOnMatchday = reader.readLong(offsets[6]);
   object.id = id;
-  object.isForOurPlayer = reader.readBool(offsets[5]);
-  object.loanMatchdays = reader.readLong(offsets[6]);
+  object.isForOurPlayer = reader.readBool(offsets[7]);
+  object.loanMatchdays = reader.readLong(offsets[8]);
+  object.loanPurchaseOptionAmount = reader.readDoubleOrNull(offsets[9]);
+  object.loanWithPurchaseOption = reader.readBoolOrNull(offsets[10]);
+  object.negotiationRounds = reader.readLong(offsets[11]);
   object.offerType =
-      _TransferOfferofferTypeValueEnumMap[reader.readByteOrNull(offsets[7])] ??
+      _TransferOfferofferTypeValueEnumMap[reader.readByteOrNull(offsets[12])] ??
           OfferType.purchase;
-  object.playerId = reader.readLong(offsets[8]);
+  object.playerId = reader.readLong(offsets[13]);
+  object.previousOffers = reader.readDoubleList(offsets[14]) ?? [];
+  object.sellOnPercentage = reader.readDoubleOrNull(offsets[15]);
   object.status =
-      _TransferOfferstatusValueEnumMap[reader.readByteOrNull(offsets[9])] ??
+      _TransferOfferstatusValueEnumMap[reader.readByteOrNull(offsets[16])] ??
           OfferStatus.pending;
+  object.swapPlayerId = reader.readLongOrNull(offsets[17]);
+  object.swapPlayerName = reader.readStringOrNull(offsets[18]);
   return object;
 }
 
@@ -147,26 +217,44 @@ P _transferOfferDeserializeProp<P>(
     case 0:
       return (reader.readDouble(offset)) as P;
     case 1:
-      return (reader.readLong(offset)) as P;
+      return (reader.readDoubleOrNull(offset)) as P;
     case 2:
-      return (reader.readString(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 3:
-      return (reader.readDateTime(offset)) as P;
-    case 4:
       return (reader.readLong(offset)) as P;
+    case 4:
+      return (reader.readString(offset)) as P;
     case 5:
-      return (reader.readBool(offset)) as P;
+      return (reader.readDateTime(offset)) as P;
     case 6:
       return (reader.readLong(offset)) as P;
     case 7:
-      return (_TransferOfferofferTypeValueEnumMap[
-              reader.readByteOrNull(offset)] ??
-          OfferType.purchase) as P;
+      return (reader.readBool(offset)) as P;
     case 8:
       return (reader.readLong(offset)) as P;
     case 9:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 10:
+      return (reader.readBoolOrNull(offset)) as P;
+    case 11:
+      return (reader.readLong(offset)) as P;
+    case 12:
+      return (_TransferOfferofferTypeValueEnumMap[
+              reader.readByteOrNull(offset)] ??
+          OfferType.purchase) as P;
+    case 13:
+      return (reader.readLong(offset)) as P;
+    case 14:
+      return (reader.readDoubleList(offset) ?? []) as P;
+    case 15:
+      return (reader.readDoubleOrNull(offset)) as P;
+    case 16:
       return (_TransferOfferstatusValueEnumMap[reader.readByteOrNull(offset)] ??
           OfferStatus.pending) as P;
+    case 17:
+      return (reader.readLongOrNull(offset)) as P;
+    case 18:
+      return (reader.readStringOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
   }
@@ -176,23 +264,27 @@ const _TransferOfferofferTypeEnumValueMap = {
   'purchase': 0,
   'loanIn': 1,
   'loanOut': 2,
+  'swap': 3,
 };
 const _TransferOfferofferTypeValueEnumMap = {
   0: OfferType.purchase,
   1: OfferType.loanIn,
   2: OfferType.loanOut,
+  3: OfferType.swap,
 };
 const _TransferOfferstatusEnumValueMap = {
   'pending': 0,
   'accepted': 1,
   'rejected': 2,
   'expired': 3,
+  'negotiating': 4,
 };
 const _TransferOfferstatusValueEnumMap = {
   0: OfferStatus.pending,
   1: OfferStatus.accepted,
   2: OfferStatus.rejected,
   3: OfferStatus.expired,
+  4: OfferStatus.negotiating,
 };
 
 Id _transferOfferGetId(TransferOffer object) {
@@ -353,6 +445,164 @@ extension TransferOfferQueryFilter
         upper: upper,
         includeUpper: includeUpper,
         epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackClauseIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'buybackClause',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackClauseIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'buybackClause',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackClauseEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'buybackClause',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackClauseGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'buybackClause',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackClauseLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'buybackClause',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackClauseBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'buybackClause',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackValidYearsIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'buybackValidYears',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackValidYearsIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'buybackValidYears',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackValidYearsEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'buybackValidYears',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackValidYearsGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'buybackValidYears',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackValidYearsLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'buybackValidYears',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      buybackValidYearsBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'buybackValidYears',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
       ));
     });
   }
@@ -782,6 +1032,174 @@ extension TransferOfferQueryFilter
   }
 
   QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      loanPurchaseOptionAmountIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'loanPurchaseOptionAmount',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      loanPurchaseOptionAmountIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'loanPurchaseOptionAmount',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      loanPurchaseOptionAmountEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'loanPurchaseOptionAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      loanPurchaseOptionAmountGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'loanPurchaseOptionAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      loanPurchaseOptionAmountLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'loanPurchaseOptionAmount',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      loanPurchaseOptionAmountBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'loanPurchaseOptionAmount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      loanWithPurchaseOptionIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'loanWithPurchaseOption',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      loanWithPurchaseOptionIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'loanWithPurchaseOption',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      loanWithPurchaseOptionEqualTo(bool? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'loanWithPurchaseOption',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      negotiationRoundsEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'negotiationRounds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      negotiationRoundsGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'negotiationRounds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      negotiationRoundsLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'negotiationRounds',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      negotiationRoundsBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'negotiationRounds',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
       offerTypeEqualTo(OfferType value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -894,6 +1312,245 @@ extension TransferOfferQueryFilter
   }
 
   QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      previousOffersElementEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'previousOffers',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      previousOffersElementGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'previousOffers',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      previousOffersElementLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'previousOffers',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      previousOffersElementBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'previousOffers',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      previousOffersLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'previousOffers',
+        length,
+        true,
+        length,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      previousOffersIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'previousOffers',
+        0,
+        true,
+        0,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      previousOffersIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'previousOffers',
+        0,
+        false,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      previousOffersLengthLessThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'previousOffers',
+        0,
+        true,
+        length,
+        include,
+      );
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      previousOffersLengthGreaterThan(
+    int length, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'previousOffers',
+        length,
+        include,
+        999999,
+        true,
+      );
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      previousOffersLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'previousOffers',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      sellOnPercentageIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'sellOnPercentage',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      sellOnPercentageIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'sellOnPercentage',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      sellOnPercentageEqualTo(
+    double? value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'sellOnPercentage',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      sellOnPercentageGreaterThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'sellOnPercentage',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      sellOnPercentageLessThan(
+    double? value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'sellOnPercentage',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      sellOnPercentageBetween(
+    double? lower,
+    double? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'sellOnPercentage',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
       statusEqualTo(OfferStatus value) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(FilterCondition.equalTo(
@@ -948,6 +1605,234 @@ extension TransferOfferQueryFilter
       ));
     });
   }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'swapPlayerId',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'swapPlayerId',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerIdEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'swapPlayerId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerIdGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'swapPlayerId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerIdLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'swapPlayerId',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerIdBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'swapPlayerId',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'swapPlayerName',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'swapPlayerName',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameEqualTo(
+    String? value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'swapPlayerName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameGreaterThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'swapPlayerName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameLessThan(
+    String? value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'swapPlayerName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameBetween(
+    String? lower,
+    String? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'swapPlayerName',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameStartsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.startsWith(
+        property: r'swapPlayerName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameEndsWith(
+    String value, {
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.endsWith(
+        property: r'swapPlayerName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.contains(
+        property: r'swapPlayerName',
+        value: value,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.matches(
+        property: r'swapPlayerName',
+        wildcard: pattern,
+        caseSensitive: caseSensitive,
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'swapPlayerName',
+        value: '',
+      ));
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterFilterCondition>
+      swapPlayerNameIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        property: r'swapPlayerName',
+        value: '',
+      ));
+    });
+  }
 }
 
 extension TransferOfferQueryObject
@@ -967,6 +1852,34 @@ extension TransferOfferQuerySortBy
   QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy> sortByAmountDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'amount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortByBuybackClause() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buybackClause', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortByBuybackClauseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buybackClause', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortByBuybackValidYears() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buybackValidYears', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortByBuybackValidYearsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buybackValidYears', Sort.desc);
     });
   }
 
@@ -1053,6 +1966,48 @@ extension TransferOfferQuerySortBy
     });
   }
 
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortByLoanPurchaseOptionAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanPurchaseOptionAmount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortByLoanPurchaseOptionAmountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanPurchaseOptionAmount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortByLoanWithPurchaseOption() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanWithPurchaseOption', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortByLoanWithPurchaseOptionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanWithPurchaseOption', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortByNegotiationRounds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'negotiationRounds', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortByNegotiationRoundsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'negotiationRounds', Sort.desc);
+    });
+  }
+
   QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy> sortByOfferType() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'offerType', Sort.asc);
@@ -1079,6 +2034,20 @@ extension TransferOfferQuerySortBy
     });
   }
 
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortBySellOnPercentage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sellOnPercentage', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortBySellOnPercentageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sellOnPercentage', Sort.desc);
+    });
+  }
+
   QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy> sortByStatus() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'status', Sort.asc);
@@ -1088,6 +2057,34 @@ extension TransferOfferQuerySortBy
   QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy> sortByStatusDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'status', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortBySwapPlayerId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'swapPlayerId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortBySwapPlayerIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'swapPlayerId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortBySwapPlayerName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'swapPlayerName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      sortBySwapPlayerNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'swapPlayerName', Sort.desc);
     });
   }
 }
@@ -1103,6 +2100,34 @@ extension TransferOfferQuerySortThenBy
   QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy> thenByAmountDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'amount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenByBuybackClause() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buybackClause', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenByBuybackClauseDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buybackClause', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenByBuybackValidYears() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buybackValidYears', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenByBuybackValidYearsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'buybackValidYears', Sort.desc);
     });
   }
 
@@ -1201,6 +2226,48 @@ extension TransferOfferQuerySortThenBy
     });
   }
 
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenByLoanPurchaseOptionAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanPurchaseOptionAmount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenByLoanPurchaseOptionAmountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanPurchaseOptionAmount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenByLoanWithPurchaseOption() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanWithPurchaseOption', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenByLoanWithPurchaseOptionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'loanWithPurchaseOption', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenByNegotiationRounds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'negotiationRounds', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenByNegotiationRoundsDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'negotiationRounds', Sort.desc);
+    });
+  }
+
   QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy> thenByOfferType() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'offerType', Sort.asc);
@@ -1227,6 +2294,20 @@ extension TransferOfferQuerySortThenBy
     });
   }
 
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenBySellOnPercentage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sellOnPercentage', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenBySellOnPercentageDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'sellOnPercentage', Sort.desc);
+    });
+  }
+
   QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy> thenByStatus() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'status', Sort.asc);
@@ -1238,6 +2319,34 @@ extension TransferOfferQuerySortThenBy
       return query.addSortBy(r'status', Sort.desc);
     });
   }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenBySwapPlayerId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'swapPlayerId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenBySwapPlayerIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'swapPlayerId', Sort.desc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenBySwapPlayerName() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'swapPlayerName', Sort.asc);
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QAfterSortBy>
+      thenBySwapPlayerNameDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'swapPlayerName', Sort.desc);
+    });
+  }
 }
 
 extension TransferOfferQueryWhereDistinct
@@ -1245,6 +2354,20 @@ extension TransferOfferQueryWhereDistinct
   QueryBuilder<TransferOffer, TransferOffer, QDistinct> distinctByAmount() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'amount');
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QDistinct>
+      distinctByBuybackClause() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'buybackClause');
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QDistinct>
+      distinctByBuybackValidYears() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'buybackValidYears');
     });
   }
 
@@ -1290,6 +2413,27 @@ extension TransferOfferQueryWhereDistinct
     });
   }
 
+  QueryBuilder<TransferOffer, TransferOffer, QDistinct>
+      distinctByLoanPurchaseOptionAmount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'loanPurchaseOptionAmount');
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QDistinct>
+      distinctByLoanWithPurchaseOption() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'loanWithPurchaseOption');
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QDistinct>
+      distinctByNegotiationRounds() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'negotiationRounds');
+    });
+  }
+
   QueryBuilder<TransferOffer, TransferOffer, QDistinct> distinctByOfferType() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'offerType');
@@ -1302,9 +2446,38 @@ extension TransferOfferQueryWhereDistinct
     });
   }
 
+  QueryBuilder<TransferOffer, TransferOffer, QDistinct>
+      distinctByPreviousOffers() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'previousOffers');
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QDistinct>
+      distinctBySellOnPercentage() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'sellOnPercentage');
+    });
+  }
+
   QueryBuilder<TransferOffer, TransferOffer, QDistinct> distinctByStatus() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'status');
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QDistinct>
+      distinctBySwapPlayerId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'swapPlayerId');
+    });
+  }
+
+  QueryBuilder<TransferOffer, TransferOffer, QDistinct>
+      distinctBySwapPlayerName({bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'swapPlayerName',
+          caseSensitive: caseSensitive);
     });
   }
 }
@@ -1320,6 +2493,20 @@ extension TransferOfferQueryProperty
   QueryBuilder<TransferOffer, double, QQueryOperations> amountProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'amount');
+    });
+  }
+
+  QueryBuilder<TransferOffer, double?, QQueryOperations>
+      buybackClauseProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'buybackClause');
+    });
+  }
+
+  QueryBuilder<TransferOffer, int?, QQueryOperations>
+      buybackValidYearsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'buybackValidYears');
     });
   }
 
@@ -1362,6 +2549,27 @@ extension TransferOfferQueryProperty
     });
   }
 
+  QueryBuilder<TransferOffer, double?, QQueryOperations>
+      loanPurchaseOptionAmountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'loanPurchaseOptionAmount');
+    });
+  }
+
+  QueryBuilder<TransferOffer, bool?, QQueryOperations>
+      loanWithPurchaseOptionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'loanWithPurchaseOption');
+    });
+  }
+
+  QueryBuilder<TransferOffer, int, QQueryOperations>
+      negotiationRoundsProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'negotiationRounds');
+    });
+  }
+
   QueryBuilder<TransferOffer, OfferType, QQueryOperations> offerTypeProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'offerType');
@@ -1374,9 +2582,36 @@ extension TransferOfferQueryProperty
     });
   }
 
+  QueryBuilder<TransferOffer, List<double>, QQueryOperations>
+      previousOffersProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'previousOffers');
+    });
+  }
+
+  QueryBuilder<TransferOffer, double?, QQueryOperations>
+      sellOnPercentageProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'sellOnPercentage');
+    });
+  }
+
   QueryBuilder<TransferOffer, OfferStatus, QQueryOperations> statusProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'status');
+    });
+  }
+
+  QueryBuilder<TransferOffer, int?, QQueryOperations> swapPlayerIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'swapPlayerId');
+    });
+  }
+
+  QueryBuilder<TransferOffer, String?, QQueryOperations>
+      swapPlayerNameProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'swapPlayerName');
     });
   }
 }

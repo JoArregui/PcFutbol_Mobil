@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:isar/isar.dart';
 import '../core/database_service.dart';
 import '../core/message_service.dart';
 import '../models/game_message.dart';

@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../core/database_service.dart';
 import '../core/game_session_service.dart';
+import '../core/responsive.dart';
 import 'team_selection_screen.dart';
 import 'main_menu_screen.dart';
+import 'debug_database_screen.dart';
 
 class TitleScreen extends StatefulWidget {
   final DatabaseService dbService;
@@ -47,15 +50,14 @@ class _TitleScreenState extends State<TitleScreen> {
   }
 
   Future<void> _newGame() async {
-    await GameSessionService(widget.dbService.isar).resetCareer();
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => TeamSelectionScreen(dbService: widget.dbService),
-      ),
-    );
-  }
+  if (!mounted) return;
+  Navigator.pushReplacement(
+    context,
+    MaterialPageRoute(
+      builder: (_) => TeamSelectionScreen(dbService: widget.dbService),
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {
@@ -66,42 +68,60 @@ class _TitleScreenState extends State<TitleScreen> {
       );
     }
 
+    final titleSize = Responsive.value<double>(context, 38, 56, 72);
+    final hPad = Responsive.horizontalPadding(context);
+
     return Scaffold(
       backgroundColor: const Color(0xFF020617),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Spacer(),
-              const Text(
-                "PC FÚTBOL",
-                style: TextStyle(
-                  color: Color(0xFFDEFF9A),
-                  fontSize: 48,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 4,
-                ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: Responsive.maxContentWidth(context)),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: hPad),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Spacer(),
+                  Text(
+                    "PC FÚTBOL",
+                    style: TextStyle(
+                      color: const Color(0xFFDEFF9A),
+                      fontSize: titleSize,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 4,
+                    ),
+                  ),
+                  const Text(
+                    "2026 EDITION",
+                    style: TextStyle(color: Colors.white38, letterSpacing: 6, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    "Homenaje al simulador de gestión más legendario",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white24, fontSize: 12),
+                  ),
+                  const Spacer(),
+                  if (_canContinue) ...[
+                    _btn("CONTINUAR", true, _continueGame),
+                    const SizedBox(height: 16),
+                  ],
+                  _btn("NUEVA PARTIDA", !_canContinue, _newGame),
+                  const SizedBox(height: 16),
+                  if (kDebugMode)
+                    _btn("🛠 DEBUG BD", false, () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => DebugDatabaseScreen(dbService: widget.dbService),
+                        ),
+                      );
+                    }),
+                  const SizedBox(height: 48),
+                ],
               ),
-              const Text(
-                "2026 EDITION",
-                style: TextStyle(color: Colors.white38, letterSpacing: 6, fontSize: 12),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                "Homenaje al simulador de gestión más legendario",
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white24, fontSize: 12),
-              ),
-              const Spacer(),
-              if (_canContinue) ...[
-                _btn("CONTINUAR", true, _continueGame),
-                const SizedBox(height: 16),
-              ],
-              _btn("NUEVA PARTIDA", !_canContinue, _newGame),
-              const SizedBox(height: 48),
-            ],
+            ),
           ),
         ),
       ),

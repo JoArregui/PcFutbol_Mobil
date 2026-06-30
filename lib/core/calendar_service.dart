@@ -1,7 +1,9 @@
 import 'dart:math';
 import 'package:isar/isar.dart';
+import '../models/finance_model.dart';
 import '../models/league_fixture.dart';
 import '../models/game_save.dart';
+import '../models/player_model.dart';
 import '../models/team.dart';
 import '../models/game_message.dart';
 import 'game_calendar.dart';
@@ -14,6 +16,8 @@ import 'financial_guard_service.dart';
 import 'board_service.dart';
 import 'transfer_ai_service.dart';
 import 'loan_service.dart';
+import 'cup_service.dart';
+import 'youth_service.dart';
 
 /// Calendario unificado: copa y liga en la misma jornada (PC Fútbol 7).
 class CalendarService {
@@ -52,6 +56,8 @@ class CalendarService {
     if (save.currentDay > 7) {
       save.currentDay = 1;
     }
+
+    save.trainingFocusesUsedToday = [];
 
     await isar.writeTxn(() => isar.gameSaves.put(save));
 
@@ -297,13 +303,11 @@ class CalendarService {
     save.currentMatchday++;
     save.currentDay = 1;
     if (save.currentMatchday > save.totalMatchdays) {
-      save.seasonFinished = true;
-      final pos = position ?? 20;
-      if (pos == 1) {
-        save.trophies = [...save.trophies, 'Liga ${save.seasonNumber}'];
-      }
-      await _tickContractsEndOfSeason(userTeamApiId);
-      await BoardService(isar).evaluateSeasonEnd(save, pos);
+      // Última jornada jugada: evaluamos el cierre de temporada y, si el
+      // entrenador no ha sido despedido, encadenamos automáticamente con
+      // una nueva temporada y un calendario regenerado.
+      await _finalizeAndChainNextSeason(userTeamApiId, userTeam, save, position);
+      return;
     } else {
       await BoardService(isar).maybeMidSeasonWarning(save, position ?? 10);
     }
@@ -315,6 +319,69 @@ class CalendarService {
       await league.persistStandingsCache();
       await isar.gameSaves.put(save);
       if (finance != null) await isar.clubFinances.put(finance);
+    });
+  }
+
+  /// Cierra la temporada actual, evalúa al presidente y, salvo despido,
+  /// regenera el calendario de liga y copa y deja al usuario en la J1 de
+  /// la siguiente temporada. Así la carrera avanza sin necesidad de
+  /// pulsar manualmente "NUEVA TEMPORADA" en el menú.
+  Future<void> _finalizeAndChainNextSeason(
+    int userTeamApiId,
+    Team userTeam,
+    GameSave save,
+    int? position,
+  ) async {
+    final league = LeagueService(isar);
+    final pos = position ?? 20;
+
+    // Cerramos la temporada actual: trofeos y despido.
+    save.seasonFinished = true;
+    if (pos == 1) {
+      save.trophies = [...save.trophies, 'Liga ${save.seasonNumber}'];
+    }
+    await _tickContractsEndOfSeason(userTeamApiId);
+    await BoardService(isar).evaluateSeasonEnd(save, pos);
+
+    if (save.financiallyDismissed) {
+      // No encadenamos nueva temporada si el entrenador ha sido cesado:
+      // el juego se queda en la pantalla de despido como hasta ahora.
+      await isar.writeTxn(() async {
+        await league.persistStandingsCache();
+        await isar.gameSaves.put(save);
+      });
+      return;
+    }
+
+    // Reseteo de flags de temporada para empezar la siguiente limpia.
+    save.seasonFinished = false;
+    save.currentMatchday = 1;
+    save.currentDay = 1;
+    save.seasonNumber++;
+    save.inCup = true;
+    save.cupRound = 1;
+    save.consecutiveRedWeeks = 0;
+
+    // Regeneramos liga (round-robin) y copa del Rey desde la J1.
+    await league.createSeason(userTeamApiId);
+    await CupService(isar).initCupForSeason(userTeamApiId);
+
+    // Mensaje de "nueva temporada" y refresco de mercado y cantera.
+    await MessageService(isar).add(
+      title: 'Temporada ${save.seasonNumber}',
+      body:
+          'La liga se ha rehecho: nuevo calendario de 38 jornadas y Copa del Rey reiniciada. '
+          'Mercado de fichajes abierto.',
+      type: MessageType.board,
+    );
+
+    await YouthService(isar).scoutYouth(teamApiId: userTeamApiId, count: 4);
+    await TransferAiService(isar)
+        .generateMatchdayOffers(userTeamApiId, save.currentMatchday);
+
+    await isar.writeTxn(() async {
+      await league.persistStandingsCache();
+      await isar.gameSaves.put(save);
     });
   }
 

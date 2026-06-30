@@ -8,6 +8,19 @@ import '../models/player_model.dart';
 import 'database_service.dart';
 import 'player_generator.dart';
 
+/// =============================================================================
+/// FLUJO DE DATOS OFICIAL (IMPORTANTE):
+/// -----------------------------------------------------------------------------
+/// 1. PRIMERA VEZ / BD VACÍA:
+///    - Consultar API Sports
+///    - Guardar TODO en BD local (equipos + jugadores)
+///
+/// 2. PARTIDAS POSTERIORES (BD CON DATOS):
+///    - NUNCA volvemos a consultar la API
+///    - TODO se obtiene EXCLUSIVAMENTE de la BD local
+///    - Solo se usa la API si el usuario empieza una partida con un equipo que
+///      NO está en la BD (extremadamente raro, solo si se añaden equipos nuevos)
+/// =============================================================================
 class ApiService {
   final String apiKey = dotenv.env['FOOTBALL_API_KEY'] ?? '';
   final String baseUrl = 'https://v3.football.api-sports.io';
@@ -20,13 +33,20 @@ class ApiService {
 
   static const _seasonsToTry = ['2024', '2023', '2025'];
 
+  /// Sincroniza equipos de la liga SOLAMENTE si la BD está VACÍA.
+  /// Si ya hay equipos guardados, NUNCA consulta la API - solo usa la BD.
   Future<void> syncLeagueTeams(int leagueId, DatabaseService db) async {
     final existingTeams = await db.getAllTeams();
+    
+    // 🔒 SI HAY DATOS EN LA BD: NO USAR API - SALIR INMEDIATAMENTE
     if (existingTeams.isNotEmpty) {
-      debugPrint('📦 ${existingTeams.length} equipos en local.');
+      debugPrint('✅ BD lista: ${existingTeams.length} equipos locales. No se consulta API.');
       return;
     }
 
+    // Si la BD está vacía y no hay otra opción: consultar API
+    debugPrint('⚠️ BD vacía - primera sincronización desde API...');
+    
     if (apiKey.isEmpty) {
       throw Exception(
           'API Key no configurada en assets/.env (FOOTBALL_API_KEY)');
@@ -73,13 +93,21 @@ class ApiService {
     return true;
   }
 
+  /// Sincroniza la plantilla de un equipo SOLAMENTE si NO tiene jugadores en BD.
+  /// Si ya hay jugadores guardados, NUNCA consulta la API - solo usa la BD.
   Future<void> syncTeamSquad(int teamId, DatabaseService db,
       {bool force = false}) async {
+    
+    // 🔒 SI HAY JUGADORES EN LA BD: NO USAR API - SALIR INMEDIATAMENTE
     if (!force) {
       final existing = await db.getPlayersByTeam(teamId);
-      if (existing.length >= 20) return;
+      if (existing.length >= 15) {
+        debugPrint('✅ Equipo $teamId: ${existing.length} jugadores en BD. No se consulta API.');
+        return;
+      }
     }
 
+    // Solo consultamos API si no hay jugadores suficientes (primera vez)
     if (apiKey.isEmpty) {
       await _fallbackGeneratedSquad(teamId, db);
       return;
@@ -158,7 +186,7 @@ class ApiService {
       }
       await db.replaceTeamSquad(teamId, players);
       debugPrint(
-          '✅ Equipo $teamId: ${players.length} jugadores reales con contratos generados');
+          '✅ Equipo $teamId: ${players.length} jugadores reales guardados en BD');
     } catch (e) {
       debugPrint('❌ squads team=$teamId: $e');
       await _fallbackGeneratedSquad(teamId, db);

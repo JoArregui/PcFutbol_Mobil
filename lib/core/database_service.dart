@@ -18,6 +18,19 @@ import 'api_service.dart';
 import 'editor_service.dart';
 import 'squad_service.dart';
 
+/// =============================================================================
+/// FLUJO DE DATOS OFICIAL (IMPORTANTE):
+/// -----------------------------------------------------------------------------
+/// 1. PRIMERA VEZ / BD VACÍA:
+///    - Consultar API Sports
+///    - Guardar TODO en BD local (equipos + jugadores)
+///
+/// 2. PARTIDAS POSTERIORES (BD CON DATOS):
+///    - NUNCA volvemos a consultar la API
+///    - TODO se obtiene EXCLUSIVAMENTE de la BD local
+///    - Solo se usa la API si el usuario empieza una partida con un equipo que
+///      NO está en la BD (extremadamente raro, solo si se añaden equipos nuevos)
+/// =============================================================================
 class DatabaseService {
   late Isar isar;
 
@@ -47,6 +60,7 @@ class DatabaseService {
           StaffSchema,
         ],
         directory: dir.path,
+        inspector: true,
       );
     } else {
       isar = Isar.getInstance()!;
@@ -55,25 +69,34 @@ class DatabaseService {
     // --- COMENTADO O ELIMINADO: No borres la base de datos en cada inicio ---
     // await isar.writeTxn(() => isar.clear()); 
 
-    // 2. Sincronización Inteligente
+    // 2. Sincronización Inteligente (SOLO SI BD VACÍA)
     final teamCount = await isar.teams.count();
     debugPrint("📊 Equipos en base de datos: $teamCount");
 
     final apiService = ApiService();
     final squadService = SquadService(isar);
 
+    // 🔒 SÓLO SI BD COMPLETAMENTE VACÍA: consultar API
     if (teamCount == 0) {
-      debugPrint("🚀 Base de datos vacía. Sincronizando con API Sports...");
+      debugPrint("🚀 BD VACÍA - Primera sincronización desde API...");
       try {
         await apiService.syncLeagueTeams(140, this);
-        debugPrint("✅ Equipos synchronized.");
+        debugPrint("✅ Datos iniciales guardados en BD.");
       } catch (e) {
-        debugPrint("❌ Error en sincronización de equipos: $e");
+        debugPrint("❌ Error en sincronización inicial: $e");
       }
+    } else {
+      // 🔒 BD CON DATOS: NO USAR API - TODO viene de la BD local
+      debugPrint("✅ BD ya inicializada - USANDO SOLO DATOS LOCALES.");
     }
 
     final playerCount = await isar.players.count();
-    if (playerCount < teamCount * 15 && teamCount > 0) {
+    final save = await isar.gameSaves.get(1);
+
+    // Solo completamos plantillas si NO hay partida activa (primera instalación).
+    // Esto evita que en cada arranque se sobreescriban los jugadores reales
+    // con jugadores generados cuando la API devuelve menos jugadores de los esperados.
+    if (playerCount < teamCount * 15 && teamCount > 0 && save == null) {
       debugPrint("👥 Faltan plantillas ($playerCount jugadores). Completando…");
       try {
         await squadService.ensureAllTeams();
@@ -81,7 +104,22 @@ class DatabaseService {
         debugPrint("❌ Error completando plantillas: $e");
       }
     }
-    
+
+    if (kDebugMode) {
+      if (save != null) {
+        final players = await isar.players
+            .filter()
+            .teamApiIdEqualTo(save.userTeamApiId)
+            .findAll();
+        for (final p in players) {
+          debugPrint(
+            '👤 ID:${p.id} | ${p.name} | ${p.position} | teamApiId:${p.teamApiId} | generado:${p.isGenerated} | cantera:${p.isYouth}',
+          );
+        }
+      }
+      debugPrint('🔍 Isar Inspector: http://localhost:8080');
+    }
+
     final currentTeams = await getAllTeams();
     final financeService = FinanceService(isar);
     
@@ -135,6 +173,10 @@ class DatabaseService {
 
   Future<List<Player>> getAllPlayers() async {
     return await isar.players.where().findAll();
+  }
+
+  Future<List<LeagueFixture>> getAllFixtures() async {
+    return await isar.leagueFixtures.where().findAll();
   }
 
   Future<List<Player>> getPlayersByTeam(int apiId, {bool professionalsOnly = false}) async {

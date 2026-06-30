@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:isar/isar.dart';
 import '../models/league_fixture.dart';
 import '../models/league_standing.dart';
+import '../models/player_model.dart';
 import '../models/team.dart';
 import '../models/finance_model.dart';
 
@@ -17,7 +18,17 @@ class LeagueService {
       throw StateError("Se necesitan al menos 2 equipos en la liga.");
     }
 
-    final teamIds = teams.map((t) => t.apiId).toList();
+    // Separamos el equipo del usuario del resto
+    final otherTeams = teams.where((t) => t.apiId != userTeamApiId).toList();
+
+    // Barajamos solo los rivales para que cada temporada el calendario sea distinto
+    otherTeams.shuffle(_rng);
+
+    // El equipo del usuario siempre va primero: así el algoritmo de Berger
+    // garantiza que juega exactamente la mitad de jornadas de local y la
+    // otra mitad de visitante a lo largo de las dos vueltas.
+    final teamIds = [userTeamApiId, ...otherTeams.map((t) => t.apiId)];
+
     final firstLeg = _generateRoundRobinRounds(teamIds);
     final secondLeg = firstLeg
         .map((round) => round.map((p) => (p.$2, p.$1)).toList())

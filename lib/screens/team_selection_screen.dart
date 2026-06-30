@@ -2,11 +2,27 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:isar/isar.dart';
+import '../core/api_service.dart';
 import '../core/database_service.dart';
 import '../core/game_session_service.dart';
+import '../core/responsive.dart';
 import '../models/team.dart';
 import 'main_menu_screen.dart';
 
+/// =============================================================================
+/// PANTALLA DE SELECCIÓN DE EQUIPO:
+/// -----------------------------------------------------------------------------
+/// FLUJO COMPLETO:
+/// 1. PRIMERA VEZ / REINICIO:
+///    - resetCareer() borra TODO (equipos, jugadores, partida...)
+///    - Se sincroniza API -> BD (datos frescos)
+///    - Usuario elige equipo
+///
+/// 2. DURANTE LA PARTIDA:
+///    - NUNCA se consulta la API
+///    - TODO se lee/escribe en la BD local
+/// =============================================================================
 class TeamSelectionScreen extends StatefulWidget {
   final DatabaseService dbService;
   const TeamSelectionScreen({super.key, required this.dbService});
@@ -122,37 +138,42 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
   }
 
   Widget _buildTeamList(List<Team> teams) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 4, top: 2),
-          child: Text(
-            "Toca una tarjeta para ver el contrato",
-            style: GoogleFonts.urbanist(
-              color: Colors.white24,
-              fontSize: 12,
-              letterSpacing: 1,
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: Responsive.maxContentWidth(context)),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4, top: 2),
+              child: Text(
+                "Toca una tarjeta para ver el contrato",
+                style: GoogleFonts.urbanist(
+                  color: Colors.white24,
+                  fontSize: 12,
+                  letterSpacing: 1,
+                ),
+              ),
             ),
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            itemCount: teams.length,
-            itemBuilder: (context, index) {
-              _initController(index);
-              final team = teams[index];
-              final isSelected = selectedTeam?.apiId == team.apiId;
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                itemCount: teams.length,
+                itemBuilder: (context, index) {
+                  _initController(index);
+                  final team = teams[index];
+                  final isSelected = selectedTeam?.apiId == team.apiId;
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: _buildFlipCard(team, index, isSelected),
-              );
-            },
-          ),
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: _buildFlipCard(team, index, isSelected),
+                  );
+                },
+              ),
+            ),
+            _buildConfirmButton(),
+          ],
         ),
-        _buildConfirmButton(),
-      ],
+      ),
     );
   }
 
@@ -417,28 +438,35 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
         height: 58,
         child: ElevatedButton(
           onPressed: selectedTeam == null || _loadingSquad
-              ? null
-              : () async {
-                  setState(() => _loadingSquad = true);
+    ? null
+    : () async {
+        setState(() => _loadingSquad = true);
 
-                  final session = GameSessionService(widget.dbService.isar);
+        final session = GameSessionService(widget.dbService.isar);
 
-                  await session.startSeason(selectedTeam!, {});
+        // 🔒 1. SINCRONIZAMOS API -> BD (solo si la BD está vacía;
+        //    syncLeagueTeams ya comprueba esto internamente)
+        debugPrint("🔄 SINCRONIZANDO DATOS DESDE API...");
+        final apiService = ApiService();
+        await apiService.syncLeagueTeams(140, widget.dbService);
 
-                  if (!mounted) return;
+        // 🔒 2. INICIAMOS LA PARTIDA
+        await session.startSeason(selectedTeam!, {});
 
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MainMenuScreen(
-                        userTeam: selectedTeam!,
-                        dbService: widget.dbService,
-                      ),
-                    ),
-                  );
+        if (!mounted) return;
 
-                  if (mounted) setState(() => _loadingSquad = false);
-                },
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MainMenuScreen(
+              userTeam: selectedTeam!,
+              dbService: widget.dbService,
+            ),
+          ),
+        );
+
+        if (mounted) setState(() => _loadingSquad = false);
+      },
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFDEFF9A),
             foregroundColor: Colors.black,
@@ -449,7 +477,7 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
             elevation: 0,
           ),
           child: Text(
-            _loadingSquad ? 'FIRMANDO CONTRATO…' : 'TOMAR LAS RIENDAS',
+            _loadingSquad ? 'SINCRONIZANDO DATOS…' : 'TOMAR LAS RIENDAS',
             style: GoogleFonts.urbanist(
               fontSize: 15,
               fontWeight: FontWeight.w900,

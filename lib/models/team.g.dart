@@ -32,23 +32,43 @@ const TeamSchema = CollectionSchema(
       name: r'city',
       type: IsarType.string,
     ),
-    r'logoUrl': PropertySchema(
+    r'initialGeneratedPlayersCount': PropertySchema(
       id: 3,
+      name: r'initialGeneratedPlayersCount',
+      type: IsarType.long,
+    ),
+    r'initialRealPlayersCount': PropertySchema(
+      id: 4,
+      name: r'initialRealPlayersCount',
+      type: IsarType.long,
+    ),
+    r'logoUrl': PropertySchema(
+      id: 5,
       name: r'logoUrl',
       type: IsarType.string,
     ),
     r'name': PropertySchema(
-      id: 4,
+      id: 6,
       name: r'name',
       type: IsarType.string,
     ),
+    r'previousSeasonPosition': PropertySchema(
+      id: 7,
+      name: r'previousSeasonPosition',
+      type: IsarType.long,
+    ),
+    r'squadAverageRating': PropertySchema(
+      id: 8,
+      name: r'squadAverageRating',
+      type: IsarType.double,
+    ),
     r'stadium': PropertySchema(
-      id: 5,
+      id: 9,
       name: r'stadium',
       type: IsarType.string,
     ),
     r'stadiumCapacity': PropertySchema(
-      id: 6,
+      id: 10,
       name: r'stadiumCapacity',
       type: IsarType.long,
     )
@@ -103,10 +123,14 @@ void _teamSerialize(
   writer.writeLong(offsets[0], object.apiId);
   writer.writeLong(offsets[1], object.budget);
   writer.writeString(offsets[2], object.city);
-  writer.writeString(offsets[3], object.logoUrl);
-  writer.writeString(offsets[4], object.name);
-  writer.writeString(offsets[5], object.stadium);
-  writer.writeLong(offsets[6], object.stadiumCapacity);
+  writer.writeLong(offsets[3], object.initialGeneratedPlayersCount);
+  writer.writeLong(offsets[4], object.initialRealPlayersCount);
+  writer.writeString(offsets[5], object.logoUrl);
+  writer.writeString(offsets[6], object.name);
+  writer.writeLong(offsets[7], object.previousSeasonPosition);
+  writer.writeDouble(offsets[8], object.squadAverageRating);
+  writer.writeString(offsets[9], object.stadium);
+  writer.writeLong(offsets[10], object.stadiumCapacity);
 }
 
 Team _teamDeserialize(
@@ -119,10 +143,14 @@ Team _teamDeserialize(
     apiId: reader.readLong(offsets[0]),
     budget: reader.readLong(offsets[1]),
     city: reader.readString(offsets[2]),
-    logoUrl: reader.readString(offsets[3]),
-    name: reader.readString(offsets[4]),
-    stadium: reader.readString(offsets[5]),
-    stadiumCapacity: reader.readLong(offsets[6]),
+    initialGeneratedPlayersCount: reader.readLongOrNull(offsets[3]) ?? 0,
+    initialRealPlayersCount: reader.readLongOrNull(offsets[4]) ?? 0,
+    logoUrl: reader.readString(offsets[5]),
+    name: reader.readString(offsets[6]),
+    previousSeasonPosition: reader.readLongOrNull(offsets[7]) ?? 10,
+    squadAverageRating: reader.readDoubleOrNull(offsets[8]) ?? 0.0,
+    stadium: reader.readString(offsets[9]),
+    stadiumCapacity: reader.readLong(offsets[10]),
   );
   object.id = id;
   return object;
@@ -142,12 +170,20 @@ P _teamDeserializeProp<P>(
     case 2:
       return (reader.readString(offset)) as P;
     case 3:
-      return (reader.readString(offset)) as P;
+      return (reader.readLongOrNull(offset) ?? 0) as P;
     case 4:
-      return (reader.readString(offset)) as P;
+      return (reader.readLongOrNull(offset) ?? 0) as P;
     case 5:
       return (reader.readString(offset)) as P;
     case 6:
+      return (reader.readString(offset)) as P;
+    case 7:
+      return (reader.readLongOrNull(offset) ?? 10) as P;
+    case 8:
+      return (reader.readDoubleOrNull(offset) ?? 0.0) as P;
+    case 9:
+      return (reader.readString(offset)) as P;
+    case 10:
       return (reader.readLong(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -676,6 +712,118 @@ extension TeamQueryFilter on QueryBuilder<Team, Team, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Team, Team, QAfterFilterCondition>
+      initialGeneratedPlayersCountEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'initialGeneratedPlayersCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition>
+      initialGeneratedPlayersCountGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'initialGeneratedPlayersCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition>
+      initialGeneratedPlayersCountLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'initialGeneratedPlayersCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition>
+      initialGeneratedPlayersCountBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'initialGeneratedPlayersCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition>
+      initialRealPlayersCountEqualTo(int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'initialRealPlayersCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition>
+      initialRealPlayersCountGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'initialRealPlayersCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition>
+      initialRealPlayersCountLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'initialRealPlayersCount',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition>
+      initialRealPlayersCountBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'initialRealPlayersCount',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
   QueryBuilder<Team, Team, QAfterFilterCondition> logoUrlEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -932,6 +1080,123 @@ extension TeamQueryFilter on QueryBuilder<Team, Team, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Team, Team, QAfterFilterCondition> previousSeasonPositionEqualTo(
+      int value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'previousSeasonPosition',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition>
+      previousSeasonPositionGreaterThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'previousSeasonPosition',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition>
+      previousSeasonPositionLessThan(
+    int value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'previousSeasonPosition',
+        value: value,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition> previousSeasonPositionBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'previousSeasonPosition',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition> squadAverageRatingEqualTo(
+    double value, {
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.equalTo(
+        property: r'squadAverageRating',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition> squadAverageRatingGreaterThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.greaterThan(
+        include: include,
+        property: r'squadAverageRating',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition> squadAverageRatingLessThan(
+    double value, {
+    bool include = false,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.lessThan(
+        include: include,
+        property: r'squadAverageRating',
+        value: value,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterFilterCondition> squadAverageRatingBetween(
+    double lower,
+    double upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    double epsilon = Query.epsilon,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(FilterCondition.between(
+        property: r'squadAverageRating',
+        lower: lower,
+        includeLower: includeLower,
+        upper: upper,
+        includeUpper: includeUpper,
+        epsilon: epsilon,
+      ));
+    });
+  }
+
   QueryBuilder<Team, Team, QAfterFilterCondition> stadiumEqualTo(
     String value, {
     bool caseSensitive = true,
@@ -1155,6 +1420,31 @@ extension TeamQuerySortBy on QueryBuilder<Team, Team, QSortBy> {
     });
   }
 
+  QueryBuilder<Team, Team, QAfterSortBy> sortByInitialGeneratedPlayersCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialGeneratedPlayersCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy>
+      sortByInitialGeneratedPlayersCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialGeneratedPlayersCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> sortByInitialRealPlayersCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialRealPlayersCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> sortByInitialRealPlayersCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialRealPlayersCount', Sort.desc);
+    });
+  }
+
   QueryBuilder<Team, Team, QAfterSortBy> sortByLogoUrl() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'logoUrl', Sort.asc);
@@ -1176,6 +1466,30 @@ extension TeamQuerySortBy on QueryBuilder<Team, Team, QSortBy> {
   QueryBuilder<Team, Team, QAfterSortBy> sortByNameDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'name', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> sortByPreviousSeasonPosition() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'previousSeasonPosition', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> sortByPreviousSeasonPositionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'previousSeasonPosition', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> sortBySquadAverageRating() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'squadAverageRating', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> sortBySquadAverageRatingDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'squadAverageRating', Sort.desc);
     });
   }
 
@@ -1253,6 +1567,31 @@ extension TeamQuerySortThenBy on QueryBuilder<Team, Team, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Team, Team, QAfterSortBy> thenByInitialGeneratedPlayersCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialGeneratedPlayersCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy>
+      thenByInitialGeneratedPlayersCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialGeneratedPlayersCount', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> thenByInitialRealPlayersCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialRealPlayersCount', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> thenByInitialRealPlayersCountDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'initialRealPlayersCount', Sort.desc);
+    });
+  }
+
   QueryBuilder<Team, Team, QAfterSortBy> thenByLogoUrl() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'logoUrl', Sort.asc);
@@ -1274,6 +1613,30 @@ extension TeamQuerySortThenBy on QueryBuilder<Team, Team, QSortThenBy> {
   QueryBuilder<Team, Team, QAfterSortBy> thenByNameDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'name', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> thenByPreviousSeasonPosition() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'previousSeasonPosition', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> thenByPreviousSeasonPositionDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'previousSeasonPosition', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> thenBySquadAverageRating() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'squadAverageRating', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Team, Team, QAfterSortBy> thenBySquadAverageRatingDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'squadAverageRating', Sort.desc);
     });
   }
 
@@ -1322,6 +1685,18 @@ extension TeamQueryWhereDistinct on QueryBuilder<Team, Team, QDistinct> {
     });
   }
 
+  QueryBuilder<Team, Team, QDistinct> distinctByInitialGeneratedPlayersCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'initialGeneratedPlayersCount');
+    });
+  }
+
+  QueryBuilder<Team, Team, QDistinct> distinctByInitialRealPlayersCount() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'initialRealPlayersCount');
+    });
+  }
+
   QueryBuilder<Team, Team, QDistinct> distinctByLogoUrl(
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
@@ -1333,6 +1708,18 @@ extension TeamQueryWhereDistinct on QueryBuilder<Team, Team, QDistinct> {
       {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'name', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Team, Team, QDistinct> distinctByPreviousSeasonPosition() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'previousSeasonPosition');
+    });
+  }
+
+  QueryBuilder<Team, Team, QDistinct> distinctBySquadAverageRating() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'squadAverageRating');
     });
   }
 
@@ -1375,6 +1762,19 @@ extension TeamQueryProperty on QueryBuilder<Team, Team, QQueryProperty> {
     });
   }
 
+  QueryBuilder<Team, int, QQueryOperations>
+      initialGeneratedPlayersCountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'initialGeneratedPlayersCount');
+    });
+  }
+
+  QueryBuilder<Team, int, QQueryOperations> initialRealPlayersCountProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'initialRealPlayersCount');
+    });
+  }
+
   QueryBuilder<Team, String, QQueryOperations> logoUrlProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'logoUrl');
@@ -1384,6 +1784,18 @@ extension TeamQueryProperty on QueryBuilder<Team, Team, QQueryProperty> {
   QueryBuilder<Team, String, QQueryOperations> nameProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'name');
+    });
+  }
+
+  QueryBuilder<Team, int, QQueryOperations> previousSeasonPositionProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'previousSeasonPosition');
+    });
+  }
+
+  QueryBuilder<Team, double, QQueryOperations> squadAverageRatingProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'squadAverageRating');
     });
   }
 

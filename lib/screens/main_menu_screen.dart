@@ -1,12 +1,14 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:isar/isar.dart';
 import '../core/calendar_service.dart';
 import '../core/database_service.dart';
 import '../core/game_calendar.dart';
 import '../core/game_session_service.dart';
 import '../core/lineup_guard.dart';
 import '../core/message_service.dart';
+import '../core/responsive.dart';
 import '../models/finance_model.dart';
 import '../models/game_save.dart';
 import '../models/league_fixture.dart';
@@ -20,7 +22,6 @@ import 'international_scout_screen.dart';
 import 'league_table_screen.dart';
 import 'lineup_screen.dart';
 import 'match_day_screen.dart';
-import 'player_search_screen.dart';
 import 'secretary_screen.dart';
 import 'squad_screen.dart';
 import 'stadium_screen.dart';
@@ -28,6 +29,8 @@ import 'president_screen.dart';
 import 'staff_screen.dart';
 import 'training_screen.dart';
 import 'transfer_offers_screen.dart';
+import 'transfer_market_screen.dart';
+import 'advanced_tactics_screen.dart';
 
 class MainMenuScreen extends StatefulWidget {
   final DatabaseService dbService;
@@ -140,53 +143,77 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                   ),
                 ),
               ),
-              SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 40),
-                      _buildHeader(save),
-                      const SizedBox(height: 28),
-                      Expanded(
-                        child: GridView.count(
-                          crossAxisCount: 3,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                          childAspectRatio: 0.95,
-                          children: [
-                            _card("PLANTILLA", FontAwesomeIcons.users, () => _go(SquadScreen(team: widget.userTeam, dbService: widget.dbService))),
-                            _card("ALINEACIÓN", FontAwesomeIcons.listOl, () => _go(LineupScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
-                            _card("ENTRENO", FontAwesomeIcons.dumbbell, () => _go(TrainingScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
-                            _card("MERCADO", FontAwesomeIcons.handshake, () => _go(PlayerSearchScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
-                            _card("OFERTAS", FontAwesomeIcons.fileContract, () => _go(TransferOffersScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
-                            _card("OJEADOR", FontAwesomeIcons.globe, () => _go(InternationalScoutScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
-                            _card("EDITOR", FontAwesomeIcons.penToSquare, () => _go(EditorScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
-                            _card("FINANZAS", FontAwesomeIcons.chartLine, () => _go(FinanceScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
-                            _card("ESTADIO", FontAwesomeIcons.landmark, () => _go(StadiumScreen(dbService: widget.dbService, team: widget.userTeam))),
-                            _card("STAFF", FontAwesomeIcons.usersCog, () => _go(StaffScreen(dbService: widget.dbService, team: widget.userTeam))),
-                            _card("CALENDARIO", FontAwesomeIcons.calendarDays, () => _go(FullCalendarScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
-                            _card("CLUB", FontAwesomeIcons.briefcase, () => _go(ClubManagementScreen(dbService: widget.dbService, team: widget.userTeam))),
-                            _card("PRESIDENTE", FontAwesomeIcons.userTie, () => _go(PresidentScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
-                            _card("CLASIFIC.", FontAwesomeIcons.rankingStar, () => _go(LeagueTableScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
-                            _card("MENSAJES", FontAwesomeIcons.envelope, () async {
-                              await _go(SecretaryScreen(dbService: widget.dbService));
-                              _refreshUnread();
-                            }, badge: _unread),
-                          ],
-                        ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final hPad = Responsive.horizontalPadding(context);
+                  return SafeArea(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: hPad),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 24),
+                          _buildHeader(save),
+                          const SizedBox(height: 20),
+                          Expanded(
+                            child: Center(
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  maxWidth: Responsive.maxContentWidth(context),
+                                ),
+                                child: _buildGrid(context),
+                              ),
+                            ),
+                          ),
+                          Center(
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: Responsive.maxContentWidth(context),
+                              ),
+                              child: _buildNextMatchBar(save),
+                            ),
+                          ),
+                        ],
                       ),
-                      _buildNextMatchBar(save),
-                    ],
-                  ),
-                ),
+                    ),
+                  );
+                },
               ),
               if (_isAdvancingDay) _buildCalendarOverlay(),
             ],
           );
         },
       ),
+    );
+  }
+
+  Widget _buildGrid(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: Responsive.gridColumns(context, min: 2, max: 5),
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: Responsive.gridAspectRatio(context),
+      children: [
+        _card("PLANTILLA", FontAwesomeIcons.users, () => _go(SquadScreen(team: widget.userTeam, dbService: widget.dbService))),
+        _card("ALINEACIÓN", FontAwesomeIcons.listOl, () => _go(LineupScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
+        _card("TÁCTICAS", FontAwesomeIcons.chessBoard, () => _go(AdvancedTacticsScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
+        _card("ENTRENO", FontAwesomeIcons.dumbbell, () => _go(TrainingScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
+        _card("MERCADO", FontAwesomeIcons.handshake, () => _go(TransferMarketScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
+        _card("OFERTAS", FontAwesomeIcons.fileContract, () => _go(TransferOffersScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
+        _card("OJEADOR", FontAwesomeIcons.globe, () => _go(InternationalScoutScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
+        _card("EDITOR", FontAwesomeIcons.penToSquare, () => _go(EditorScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
+        _card("FINANZAS", FontAwesomeIcons.chartLine, () => _go(FinanceScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
+        _card("ESTADIO", FontAwesomeIcons.landmark, () => _go(StadiumScreen(dbService: widget.dbService, team: widget.userTeam))),
+        _card("STAFF", FontAwesomeIcons.usersCog, () => _go(StaffScreen(dbService: widget.dbService, team: widget.userTeam))),
+        _card("CALENDARIO", FontAwesomeIcons.calendarDays, () => _go(FullCalendarScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
+        _card("CLUB", FontAwesomeIcons.briefcase, () => _go(ClubManagementScreen(dbService: widget.dbService, team: widget.userTeam))),
+        _card("PRESIDENTE", FontAwesomeIcons.userTie, () => _go(PresidentScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
+        _card("CLASIFIC.", FontAwesomeIcons.rankingStar, () => _go(LeagueTableScreen(dbService: widget.dbService, userTeam: widget.userTeam))),
+        _card("MENSAJES", FontAwesomeIcons.envelope, () async {
+          await _go(SecretaryScreen(dbService: widget.dbService));
+          _refreshUnread();
+        }, badge: _unread),
+      ],
     );
   }
 
@@ -294,12 +321,22 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
             const Text("PC FÚTBOL", style: TextStyle(color: Color(0xFFDEFF9A), fontSize: 38, fontWeight: FontWeight.w900, letterSpacing: -1)),
             Row(
               children: [
+                if (save != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(color: const Color(0xFFDEFF9A), borderRadius: BorderRadius.circular(4)),
+                    child: Text(
+                      "T${save.seasonNumber}",
+                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  ),
+                if (save != null) const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: const Color(0xFFDEFF9A), borderRadius: BorderRadius.circular(4)),
+                  decoration: BoxDecoration(color: const Color(0xFFDEFF9A).withValues(alpha: 0.18), borderRadius: BorderRadius.circular(4)),
                   child: Text(
                     save != null ? "J${save.currentMatchday}/${save.totalMatchdays}" : "2026",
-                    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 11),
+                    style: const TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold, fontSize: 11),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -451,6 +488,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
     }
 
     if (save?.seasonFinished == true) {
+      // La cadena automática de temporadas no debería dejarnos aquí, pero
+      // mantenemos esta pantalla como salvaguarda por si algo falla
+      // (p. ej. despido antes de la última jornada o error en cadena).
       return Padding(
         padding: const EdgeInsets.only(bottom: 24),
         child: Column(
@@ -466,7 +506,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> with TickerProviderStat
                 await _session.startNextSeason(widget.userTeam);
                 if (mounted) setState(() {});
               },
-              child: const Text("NUEVA TEMPORADA", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
+              child: const Text("REINTENTAR NUEVA TEMPORADA", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900)),
             ),
           ],
         ),

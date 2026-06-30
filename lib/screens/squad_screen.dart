@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../core/squad_service.dart';
 import '../models/player_model.dart';
 import '../models/team.dart';
 import '../core/database_service.dart';
@@ -25,8 +24,8 @@ class _SquadScreenState extends State<SquadScreen> {
   }
 
   Future<void> _loadSquad() async {
-    final squad = SquadService.fromDatabase(widget.dbService);
-    final players = await squad.ensureSquad(widget.team.apiId);
+    // Simplemente cargamos los jugadores existentes sin modificar nada!
+    final players = await widget.dbService.getPlayersByTeam(widget.team.apiId, professionalsOnly: false);
     final pros = players.where((p) => !p.isYouth).toList();
     if (mounted) {
       setState(() {
@@ -62,17 +61,6 @@ class _SquadScreenState extends State<SquadScreen> {
           style: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 2)),
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFFDEFF9A)),
-            tooltip: 'Actualizar plantilla',
-            onPressed: () async {
-              setState(() => _squadFuture = null);
-              await SquadService.fromDatabase(widget.dbService).ensureSquad(widget.team.apiId, tryApiFirst: true);
-              await _loadSquad();
-            },
-          ),
-        ],
       ),
       body: _squadFuture == null 
         ? const Center(child: CircularProgressIndicator(color: Color(0xFFDEFF9A)))

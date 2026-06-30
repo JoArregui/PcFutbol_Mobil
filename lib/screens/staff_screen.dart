@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../core/database_service.dart';
 import '../core/staff_service.dart';
+import '../models/finance_model.dart';
 import '../models/staff.dart';
 import '../models/staff_member.dart';
 import '../models/team.dart';

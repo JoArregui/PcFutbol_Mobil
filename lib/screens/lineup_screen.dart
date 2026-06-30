@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/database_service.dart';
 import '../core/lineup_service.dart';
+import '../core/responsive.dart';
 import '../core/tactics_service.dart';
 import '../models/player_model.dart';
 import '../models/team.dart';
@@ -153,6 +154,82 @@ class _LineupScreenState extends State<LineupScreen> {
     }
   }
 
+  /// Vacía la convocatoria (titulares y suplentes) tras pedir
+  /// confirmación. Mantiene la formación elegida.
+  Future<void> _clearSquad() async {
+    if (_starters.isEmpty && _bench.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('La convocatoria ya está vacía.')),
+      );
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFFDEFF9A), width: 0.5),
+        ),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_sweep_outlined, color: Color(0xFFDEFF9A), size: 20),
+            SizedBox(width: 8),
+            Text(
+              'LIMPIAR CONVOCATORIA',
+              style: TextStyle(
+                color: Color(0xFFDEFF9A),
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+        content: const Text(
+          '¿Vaciar la convocatoria? Se quitarán los 11 titulares y 7 suplentes '
+          'que hayas elegido. La formación táctica se mantiene.',
+          style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'CANCELAR',
+              style: TextStyle(color: Colors.white54, fontWeight: FontWeight.bold),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(
+              'SÍ, VACIAR',
+              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    await _lineup.clearLineup();
+    setState(() {
+      _starters.clear();
+      _bench.clear();
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Convocatoria reiniciada. Selecciona un nuevo 11 inicial.'),
+        backgroundColor: Color(0xFF0F172A),
+      ),
+    );
+  }
+
   Color? _playerColor(int id) {
     if (_starters.contains(id)) return const Color(0xFFDEFF9A);
     if (_bench.contains(id)) return Colors.amber;
@@ -176,6 +253,14 @@ class _LineupScreenState extends State<LineupScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
+          TextButton.icon(
+            onPressed: _clearSquad,
+            icon: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent, size: 18),
+            label: const Text(
+              'LIMPIAR',
+              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
+            ),
+          ),
           TextButton(
             onPressed: () async {
               await _lineup.autoPickMatchdaySquad(widget.userTeam.apiId);
@@ -190,10 +275,17 @@ class _LineupScreenState extends State<LineupScreen> {
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFFDEFF9A)))
-          : Column(
-              children: [
+          : Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: Responsive.maxContentWidth(context),
+                ),
+                child: Column(
+                  children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: Responsive.horizontalPadding(context),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -338,7 +430,9 @@ class _LineupScreenState extends State<LineupScreen> {
                     ),
                   ),
                 ),
-              ],
+                  ],
+                ),
+              ),
             ),
     );
   }

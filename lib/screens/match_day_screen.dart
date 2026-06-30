@@ -11,6 +11,8 @@ import '../core/match_engine.dart';
 import '../models/match_event.dart';
 import '../models/player_model.dart';
 import '../models/team.dart';
+import '../models/match_stats.dart';
+import '../core/press_service.dart';
 import '../widgets/match_substitution_sheet.dart';
 
 class MatchDayScreen extends StatefulWidget {
@@ -151,6 +153,7 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
     return List.generate(
       11,
       (i) => Player()
+        ..id = -(i + 1)
         ..name = "Jugador ${i + 1}"
         ..position = i == 0 ? 'GK' : (i < 5 ? 'DEF' : (i < 9 ? 'MID' : 'FWD'))
         ..age = 25
@@ -159,6 +162,7 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
         ..teamId = ''
         ..marketValue = 1
         ..salary = 1
+        ..buyoutClause = 1
         ..personality = Personality.professional,
     );
   }
@@ -362,6 +366,13 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
       userTeam: widget.userTeam,
     );
 
+    // Generar hoja de partido
+    final matchStats = _engine.generateFullStats(
+      events: _fullTimeline,
+      homePlayers: _homePlayers,
+      awayPlayers: _awayPlayers,
+    );
+
     if (!mounted) return;
 
     final homeLabel = widget.userIsHome ? widget.userTeam.name : widget.opponent.name;
@@ -377,22 +388,32 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
           "FINAL — $comp",
           style: const TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.w900),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "$homeLabel $_homeScore - $_awayScore $awayLabel",
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Marcador final
+                Center(
+                  child: Text(
+                    "$homeLabel $_homeScore - $_awayScore $awayLabel",
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Hoja de partido
+                _buildMatchSheet(matchStats, homeLabel, awayLabel),
+                const SizedBox(height: 16),
+                // Notas de prensa
+                _buildPressReport(matchStats, homeLabel, awayLabel),
+                const SizedBox(height: 16),
+                Text(_resultLine(), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              "Tu resultado: $_userScore - $_opponentScore",
-              style: const TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-            Text(_resultLine(), textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70)),
-          ],
+          ),
         ),
         actions: [
           TextButton(
@@ -406,6 +427,99 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Construye la hoja de partido
+  Widget _buildMatchSheet(FullMatchStats stats, String homeName, String awayName) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "📋 HOJA DE PARTIDO",
+          style: TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        const SizedBox(height: 12),
+        // Estadísticas generales
+        _buildStatsRow("TIROS", "${stats.homeShots}", "${stats.awayShots}"),
+        _buildStatsRow("TIROS A PUERTA", "${stats.homeShotsOnTarget}", "${stats.awayShotsOnTarget}"),
+        _buildStatsRow("CÓRNERS", "${stats.homeCorners}", "${stats.awayCorners}"),
+        _buildStatsRow("FALTAS", "${stats.homeFouls}", "${stats.awayFouls}"),
+        _buildStatsRow("T. AMARILLAS", "${stats.homeYellowCards}", "${stats.awayYellowCards}"),
+        _buildStatsRow("T. ROJAS", "${stats.homeRedCards}", "${stats.awayRedCards}"),
+        const SizedBox(height: 12),
+        // Jugador del partido
+        if (stats.manOfTheMatch != null) ...[
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFDEFF9A).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFDEFF9A).withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.star, color: Color(0xFFDEFF9A), size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text("JUGADOR DEL PARTIDO", style: TextStyle(color: Colors.white38, fontSize: 9)),
+                      Text(
+                        "${stats.manOfTheMatch!.playerName} (${stats.manOfTheMatch!.rating.toStringAsFixed(1)})",
+                        style: const TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// Fila de estadísticas
+  Widget _buildStatsRow(String label, String homeVal, String awayVal) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Expanded(child: Text(homeVal, textAlign: TextAlign.right, style: const TextStyle(color: Colors.white))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(label, style: const TextStyle(color: Colors.white38, fontSize: 10)),
+          ),
+          Expanded(child: Text(awayVal, style: const TextStyle(color: Colors.white))),
+        ],
+      ),
+    );
+  }
+
+  /// Construye las notas de prensa
+  Widget _buildPressReport(FullMatchStats stats, String homeName, String awayName) {
+    final pressReport = PressService.generateMatchReport(
+      teamName: widget.userTeam.name,
+      opponentName: widget.opponent.name,
+      ourGoals: _userScore,
+      theirGoals: _opponentScore,
+      stats: stats,
+      wasHome: widget.userIsHome,
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFDEFF9A).withValues(alpha: 0.2)),
+      ),
+      child: Text(
+        pressReport,
+        style: const TextStyle(color: Colors.white70, fontSize: 11, height: 1.4),
       ),
     );
   }

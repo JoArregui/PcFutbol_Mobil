@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:isar/isar.dart';
 import '../core/training_engine.dart';
 import '../core/database_service.dart';
 import '../core/game_session_service.dart';
@@ -27,6 +28,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
   int _maxSelectablePlayers = 3;
   List<Player> _teamPlayers = [];
   final List<int> _selectedPlayerIds = [];
+  List<String> _usedFocusesToday = [];
 
   final Map<TrainingFocus, dynamic> _focusData = {
     TrainingFocus.fitness: {"icon": FontAwesomeIcons.bolt, "label": "Físico", "desc": "Mejora resistencia y velocidad."},
@@ -46,17 +48,20 @@ class _TrainingScreenState extends State<TrainingScreen> {
     final session = GameSessionService(widget.dbService.isar);
     final multiplier = await session.trainingMultiplier();
     final engine = TrainingEngine(widget.dbService.isar);
-    
+
     final limit = engine.getSelectionLimit(multiplier);
     final players = await widget.dbService.isar.players
         .filter()
         .teamApiIdEqualTo(widget.userTeam.apiId)
         .findAll();
 
+    final save = await session.getSave();
+
     setState(() {
       _staffMultiplier = multiplier;
       _maxSelectablePlayers = limit;
       _teamPlayers = players;
+      _usedFocusesToday = save?.trainingFocusesUsedToday ?? [];
       _isLoadingData = false;
     });
   }
@@ -68,11 +73,12 @@ class _TrainingScreenState extends State<TrainingScreen> {
     setState(() => _isTraining = true);
 
     final engine = TrainingEngine(widget.dbService.isar);
-    
+
     // El motor elige dinámicamente el foco e identifica a los jugadores ideales según su potencial
     final autoConfig = engine.autoSelectConfiguration(
       teamPlayers: _teamPlayers,
       maxCupos: _maxSelectablePlayers,
+      usedFocuses: _usedFocusesToday,
     );
 
     final TrainingFocus chosenFocus = autoConfig["focus"];
@@ -84,6 +90,20 @@ class _TrainingScreenState extends State<TrainingScreen> {
       staffMultiplier: _staffMultiplier,
     );
 
+    if (report.isEmpty) {
+      if (mounted) {
+        setState(() => _isTraining = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("El foco seleccionado automáticamente ya fue entrenado hoy."),
+            backgroundColor: Colors.amber,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
     int totalImproved = report.values.where((r) => r.improved).length;
 
     await MessageService(widget.dbService.isar).add(
@@ -93,9 +113,8 @@ class _TrainingScreenState extends State<TrainingScreen> {
     );
 
     if (mounted) {
-      setState(() {
-        _isTraining = false;
-      });
+      setState(() => _isTraining = false);
+      await _loadStaffAndPlayers();
       _showEvolutionDialog(report);
     }
   }
@@ -112,6 +131,20 @@ class _TrainingScreenState extends State<TrainingScreen> {
       staffMultiplier: _staffMultiplier,
     );
 
+    if (report.isEmpty) {
+      if (mounted) {
+        setState(() => _isTraining = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("El foco '${_focusData[_selectedFocus!]['label']}' ya fue entrenado hoy. Avanza de día para desbloquearlo."),
+            backgroundColor: Colors.amber,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+      return;
+    }
+
     int totalImproved = report.values.where((r) => r.improved).length;
 
     await MessageService(widget.dbService.isar).add(
@@ -121,9 +154,8 @@ class _TrainingScreenState extends State<TrainingScreen> {
     );
 
     if (mounted) {
-      setState(() {
-        _isTraining = false;
-      });
+      setState(() => _isTraining = false);
+      await _loadStaffAndPlayers();
       _showEvolutionDialog(report);
     }
   }
@@ -204,7 +236,7 @@ class _TrainingScreenState extends State<TrainingScreen> {
                   _selectedFocus = null;
                   _selectedPlayerIds.clear();
                 });
-                _loadStaffAndPlayers(); 
+                _loadStaffAndPlayers();
               },
               child: const Text("ENTENDIDO", style: TextStyle(color: Color(0xFFDEFF9A), fontWeight: FontWeight.bold)),
             )
@@ -329,34 +361,58 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   Widget _buildHorizontalFocusCard(TrainingFocus focus) {
+    final isUsed = _usedFocusesToday.contains(focus.name);
     final isSelected = _selectedFocus == focus;
     final data = _focusData[focus];
 
     return GestureDetector(
-      onTap: () => setState(() => _selectedFocus = focus),
+      onTap: isUsed ? null : () => setState(() => _selectedFocus = focus),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         width: 130,
         margin: const EdgeInsets.only(right: 12, bottom: 4, top: 4),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFDEFF9A).withOpacity(0.15) : const Color(0xFF0F172A),
+          color: isUsed
+              ? const Color(0xFF0F172A).withOpacity(0.4)
+              : isSelected
+                  ? const Color(0xFFDEFF9A).withOpacity(0.15)
+                  : const Color(0xFF0F172A),
           borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: isSelected ? const Color(0xFFDEFF9A) : Colors.white10, width: 2),
+          border: Border.all(
+            color: isUsed
+                ? Colors.white10
+                : isSelected
+                    ? const Color(0xFFDEFF9A)
+                    : Colors.white10,
+            width: 2,
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(data['icon'], color: isSelected ? const Color(0xFFDEFF9A) : Colors.white54, size: 24),
+            Icon(
+              data['icon'],
+              color: isUsed
+                  ? Colors.white12
+                  : isSelected
+                      ? const Color(0xFFDEFF9A)
+                      : Colors.white54,
+              size: 24,
+            ),
             const SizedBox(height: 8),
             Text(
               data['label'],
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: isUsed ? Colors.white24 : Colors.white,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 2),
             Text(
-              data['desc'],
+              isUsed ? 'Ya entrenado hoy' : data['desc'],
               style: const TextStyle(fontSize: 9, color: Colors.white38),
               textAlign: TextAlign.center,
               maxLines: 2,
@@ -369,7 +425,10 @@ class _TrainingScreenState extends State<TrainingScreen> {
   }
 
   Widget _buildActionControlPanel() {
-    final canTrainManual = _selectedFocus != null && _selectedPlayerIds.isNotEmpty && !_isTraining;
+    final canTrainManual = _selectedFocus != null &&
+        _selectedPlayerIds.isNotEmpty &&
+        !_isTraining &&
+        !_usedFocusesToday.contains(_selectedFocus?.name);
 
     return Row(
       children: [
@@ -401,13 +460,15 @@ class _TrainingScreenState extends State<TrainingScreen> {
             child: _isTraining
                 ? const CircularProgressIndicator(color: Colors.black)
                 : Text(
-                    _selectedFocus == null 
-                        ? "SELECCIONA UN FOCO" 
-                        : _selectedPlayerIds.isEmpty 
-                            ? "SELECCIONA JUGADORES" 
-                            : "INICIAR SESIÓN",
+                    _selectedFocus == null
+                        ? "SELECCIONA UN FOCO"
+                        : _selectedPlayerIds.isEmpty
+                            ? "SELECCIONA JUGADORES"
+                            : _usedFocusesToday.contains(_selectedFocus?.name)
+                                ? "YA ENTRENADO HOY"
+                                : "INICIAR SESIÓN",
                     style: TextStyle(
-                      fontWeight: FontWeight.bold, 
+                      fontWeight: FontWeight.bold,
                       fontSize: 14,
                       color: canTrainManual ? Colors.black : Colors.white24,
                     ),

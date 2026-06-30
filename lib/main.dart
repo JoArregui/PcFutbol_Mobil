@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+/* import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/database_service.dart';
 import 'screens/title_screen.dart';
@@ -87,6 +87,44 @@ class PCFutbol2026 extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+} */
+
+
+
+
+
+
+
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'screens/splash_screen.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Cargamos variables de entorno antes de lanzar la App
+  await dotenv.load(fileName: "assets/.env");
+
+  runApp(const PCFutbol2026());
+}
+
+class PCFutbol2026 extends StatelessWidget {
+  const PCFutbol2026({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'PC Fútbol 2026',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        primaryColor: const Color(0xFFDEFF9A),
+        scaffoldBackgroundColor: const Color(0xFF020617),
+        useMaterial3: true,
+      ),
+      home: const SplashScreen(),
     );
   }
 }
