@@ -178,6 +178,19 @@ const PlayerSchema = CollectionSchema(
           caseSensitive: false,
         )
       ],
+    ),
+    r'isYouth': IndexSchema(
+      id: -895132139811771596,
+      name: r'isYouth',
+      unique: false,
+      replace: false,
+      properties: [
+        IndexPropertySchema(
+          name: r'isYouth',
+          type: IndexType.value,
+          caseSensitive: false,
+        )
+      ],
     )
   },
   links: {},
@@ -371,6 +384,14 @@ extension PlayerQueryWhereSort on QueryBuilder<Player, Player, QWhere> {
     return QueryBuilder.apply(this, (query) {
       return query.addWhereClause(
         const IndexWhereClause.any(indexName: r'teamApiId'),
+      );
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterWhere> anyIsYouth() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(
+        const IndexWhereClause.any(indexName: r'isYouth'),
       );
     });
   }
@@ -727,6 +748,50 @@ extension PlayerQueryWhere on QueryBuilder<Player, Player, QWhereClause> {
         upper: [upperTeamApiId],
         includeUpper: includeUpper,
       ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterWhereClause> isYouthEqualTo(bool isYouth) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addWhereClause(IndexWhereClause.equalTo(
+        indexName: r'isYouth',
+        value: [isYouth],
+      ));
+    });
+  }
+
+  QueryBuilder<Player, Player, QAfterWhereClause> isYouthNotEqualTo(
+      bool isYouth) {
+    return QueryBuilder.apply(this, (query) {
+      if (query.whereSort == Sort.asc) {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isYouth',
+              lower: [],
+              upper: [isYouth],
+              includeUpper: false,
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isYouth',
+              lower: [isYouth],
+              includeLower: false,
+              upper: [],
+            ));
+      } else {
+        return query
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isYouth',
+              lower: [isYouth],
+              includeLower: false,
+              upper: [],
+            ))
+            .addWhereClause(IndexWhereClause.between(
+              indexName: r'isYouth',
+              lower: [],
+              upper: [isYouth],
+              includeUpper: false,
+            ));
+      }
     });
   }
 }

@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:isar/isar.dart';
 import '../models/player_model.dart';
+import '../models/game_save.dart';
 import '../models/game_message.dart';
 import 'message_service.dart';
 import 'player_generator.dart';
@@ -68,20 +69,31 @@ class PlayerProgressionService {
       }
     }
 
-    // ── Persistir cambios ────────────────────────────────────────────────
+    // ── Persistir cambios en bulk ────────────────────────────────────────────────
     await isar.writeTxn(() async {
-      await isar.players.putAll(toUpdate);
-      for (final p in toRetire) {
-        await isar.players.delete(p.id);
+      if (toUpdate.isNotEmpty) {
+        await isar.players.putAll(toUpdate);
+      }
+      if (toRetire.isNotEmpty) {
+        await isar.players.deleteAll(toRetire.map((p) => p.id).toList());
       }
     });
 
     // ── Generar reemplazos jóvenes ────────────────────────────────────────
-    // Agrupamos los retirados por equipo para generar un reemplazo por cada uno
+    // Agrupamos los retirados por equipo para generar un reemplazo por cada uno.
+    // Huérfanos (teamApiId==0/null): asignamos al equipo del usuario si existe,
+    // o los omitimos si no hay partida activa (evita bloat sin dueño).
     final retiredByTeam = <int, int>{};
     for (final r in toRetire) {
-      final tid = r.teamApiId ?? 0;
-      if (tid == 0) continue;
+      var tid = r.teamApiId ?? 0;
+      if (tid == 0) {
+        final save = await isar.gameSaves.get(1);
+        if (save != null && save.userTeamApiId > 0) {
+          tid = save.userTeamApiId;
+        } else {
+          continue; // sin dueño conocido, no generar reemplazo
+        }
+      }
       retiredByTeam[tid] = (retiredByTeam[tid] ?? 0) + 1;
     }
 

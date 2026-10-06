@@ -114,6 +114,9 @@ class LineupService {
     required List<int> benchIds,
     String? formation,
   }) async {
+    // Validar duplicados: un jugador no puede estar en ambos.
+    final dupes = starterIds.toSet().intersection(benchIds.toSet());
+    if (dupes.isNotEmpty) return;
     final current = await getLineup();
     final lineup = UserLineup()
       ..id = 1
@@ -157,23 +160,27 @@ class LineupService {
         .teamApiIdEqualTo(teamApiId)
         .isYouthEqualTo(false)
         .findAll();
-    if (all.length < requiredMatchdaySquad) return;
+    // Solo disponibles: sin lesión ni sanción.
+    final available =
+        all.where((p) => p.injuredDays <= 0 && p.suspendedMatches <= 0).toList();
+    if (available.length < requiredMatchdaySquad) return;
 
-    all.sort((a, b) => b.average.compareTo(a.average));
+    available.sort((a, b) => b.average.compareTo(a.average));
 
-    final gk = all.where((p) => p.position == 'GK').toList();
-    final def = all.where((p) => p.position == 'DEF').toList();
-    final mid = all.where((p) => p.position == 'MID').toList();
-    final fwd = all.where((p) => p.position == 'FWD').toList();
+    final gk = available.where((p) => p.position == 'GK').toList();
+    if (gk.isEmpty) return; // Sin portero disponible no generar alineación inválida.
+    final def = available.where((p) => p.position == 'DEF').toList();
+    final mid = available.where((p) => p.position == 'MID').toList();
+    final fwd = available.where((p) => p.position == 'FWD').toList();
 
     final picked = <Player>[];
-    if (gk.isNotEmpty) picked.add(gk.first);
+    picked.add(gk.first);
     picked.addAll(def.take(4));
     picked.addAll(mid.take(4));
     picked.addAll(fwd.take(2));
 
     final used = picked.map((p) => p.id).toSet();
-    for (final p in all) {
+    for (final p in available) {
       if (picked.length >= requiredStarters) break;
       if (!used.contains(p.id)) {
         picked.add(p);
@@ -181,12 +188,25 @@ class LineupService {
       }
     }
 
+    // Garantizar portero en el 11 aunque el relleno lo haya desplazado.
+    if (!picked.any((p) => p.position == 'GK')) {
+      // Sustituir el peor no-portero por el mejor portero disponible.
+      final nonGk = picked.where((p) => p.position != 'GK').toList()
+        ..sort((a, b) => a.average.compareTo(b.average));
+      if (nonGk.isNotEmpty) {
+        picked.remove(nonGk.first);
+        picked.add(gk.firstWhere((g) => !used.contains(g.id),
+            orElse: () => gk.first));
+      }
+    }
+
     final bench = <Player>[];
-    for (final p in all) {
+    final usedWithPicked = {...used, ...picked.map((p) => p.id)};
+    for (final p in available) {
       if (bench.length >= requiredBench) break;
-      if (!used.contains(p.id)) {
+      if (!usedWithPicked.contains(p.id)) {
         bench.add(p);
-        used.add(p.id);
+        usedWithPicked.add(p.id);
       }
     }
 

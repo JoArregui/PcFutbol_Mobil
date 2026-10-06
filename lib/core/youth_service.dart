@@ -19,10 +19,17 @@ class YouthService {
   /// Genera y busca futbolistas para la cantera del club o del mercado general.
   /// Delega en [PlayerGenerator] para garantizar coherencia de posiciones,
   /// nombres y financiero con el resto del juego.
+  static const int maxYouthPerTeam = 24; // Tope para evitar bloat infinito
+
   Future<void> scoutYouth({required int teamApiId, required int count}) async {
+    final currentYouth = await getYouthSquad(teamApiId);
+    if (currentYouth.length >= maxYouthPerTeam) return; // Ya lleno
+    final allowed = (maxYouthPerTeam - currentYouth.length).clamp(0, count);
+    if (allowed <= 0) return;
+
     final newYouthPlayers = PlayerGenerator.generateYouthReplacements(
       teamApiId,
-      count,
+      allowed,
     );
 
     // Escritura en bloque dentro de la transacción de Isar

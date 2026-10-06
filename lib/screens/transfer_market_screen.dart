@@ -5,7 +5,6 @@ import '../core/transfer_manager_service.dart';
 import '../models/player_model.dart';
 import '../models/team.dart';
 import '../models/finance_model.dart';
-import '../models/game_save.dart';
 
 class TransferMarketScreen extends StatefulWidget {
   final DatabaseService dbService;
@@ -27,7 +26,6 @@ class _TransferMarketScreenState extends State<TransferMarketScreen> {
   List<Player> _ourPlayers = [];
   List<Player> _recommendations = [];
   ClubFinance? _finance;
-  GameSave? _save;
   bool _loading = true;
   String _selectedPosition = 'ALL';
   final double _maxPrice = 100000000;
@@ -45,7 +43,6 @@ class _TransferMarketScreenState extends State<TransferMarketScreen> {
 
   Future<void> _loadData() async {
     _finance = await widget.dbService.isar.clubFinances.get(1);
-    _save = await widget.dbService.isar.gameSaves.get(1);
     final allPlayers = await widget.dbService.getAllPlayers();
     final ourPlayersList = allPlayers.where((p) =>
         p.teamApiId == widget.userTeam.apiId && p.isYouth == false).toList();

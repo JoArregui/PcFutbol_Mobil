@@ -80,12 +80,14 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _bootstrap() async {
     final stopwatch = Stopwatch()..start();
     final dbService = DatabaseService();
+    bool initOk = true;
 
     try {
-      setState(() => _status = "Cargando base de datos…");
+      if (mounted) setState(() => _status = "Cargando base de datos…");
       await dbService.init();
     } catch (e) {
-      setState(() => _status = "Error al iniciar. Reintentando…");
+      initOk = false;
+      if (mounted) setState(() => _status = "Error al iniciar. Reintentando…");
       debugPrint("❌ Error inicializando BD: $e");
     }
 
@@ -98,6 +100,12 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     if (!mounted) return;
+    if (!initOk) {
+      if (mounted) {
+        setState(() => _status = "No se pudo iniciar la BD. Revisa almacenamiento.");
+      }
+      return;
+    }
 
     Navigator.pushReplacement(
       context,

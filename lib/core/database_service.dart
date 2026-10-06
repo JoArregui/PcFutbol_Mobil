@@ -17,6 +17,11 @@ import 'finance_service.dart';
 import 'api_service.dart';
 import 'editor_service.dart';
 import 'squad_service.dart';
+import 'player_generator.dart';
+
+/// Pagination defaults
+const int _kDefaultPageSize = 50;
+const int _kMaxPageSize = 200;
 
 /// =============================================================================
 /// FLUJO DE DATOS OFICIAL (IMPORTANTE):
@@ -42,6 +47,15 @@ class DatabaseService {
   Future<void> init() async {
     final dir = await getApplicationDocumentsDirectory();
     
+    // 0. Precargar NOMBRES REALES del pool de players.json ANTES de cualquier generación
+    debugPrint('📦 Precargando nombres reales del pool assets/data/players.json…');
+    try {
+      await PlayerGenerator.preloadRealNames();
+      debugPrint('✅ Pool de nombres reales cargado.');
+    } catch (e) {
+      debugPrint('⚠️  No se pudo cargar pool de nombres reales: $e');
+    }
+
     // Abrimos Isar solo si no está ya abierto
     if (Isar.instanceNames.isEmpty) {
       isar = await Isar.open(
@@ -84,20 +98,23 @@ class DatabaseService {
         debugPrint("✅ Datos iniciales guardados en BD.");
       } catch (e) {
         debugPrint("❌ Error en sincronización inicial: $e");
+      } finally {
+        apiService.dispose();
       }
     } else {
       // 🔒 BD CON DATOS: NO USAR API - TODO viene de la BD local
       debugPrint("✅ BD ya inicializada - USANDO SOLO DATOS LOCALES.");
+      apiService.dispose();
     }
 
     final playerCount = await isar.players.count();
     final save = await isar.gameSaves.get(1);
 
-    // Solo completamos plantillas si NO hay partida activa (primera instalación).
-    // Esto evita que en cada arranque se sobreescriban los jugadores reales
-    // con jugadores generados cuando la API devuelve menos jugadores de los esperados.
-    if (playerCount < teamCount * 15 && teamCount > 0 && save == null) {
-      debugPrint("👥 Faltan plantillas ($playerCount jugadores). Completando…");
+    // Siempre validamos plantillas si NO hay partida activa (setup inicial).
+    // La regla 75/25 y mínimos posicionales DEBEN cumplirse estrictamente,
+    // independientemente de cuántos jugadores devuelva la API.
+    if (teamCount > 0 && save == null) {
+      debugPrint("👥 Validando plantillas iniciales ($playerCount jugadores en BD)…");
       try {
         await squadService.ensureAllTeams();
       } catch (e) {
@@ -159,43 +176,67 @@ class DatabaseService {
   /// Sustituye la plantilla de un equipo (p. ej. tras mezclar API + generados).
   Future<void> replaceTeamSquad(int teamApiId, List<Player> players) async {
     await isar.writeTxn(() async {
-      final old = await isar.players.filter().teamApiIdEqualTo(teamApiId).findAll();
-      for (final p in old) {
-        await isar.players.delete(p.id);
+      await isar.players.filter().teamApiIdEqualTo(teamApiId).deleteAll();
+      if (players.isNotEmpty) {
+        await isar.players.putAll(players);
       }
-      await isar.players.putAll(players);
     });
   }
 
-  Future<List<Team>> getAllTeams() async {
-    return await isar.teams.where().findAll();
+  Future<List<Team>> getAllTeams({int offset = 0, int limit = _kDefaultPageSize}) async {
+    final l = limit.clamp(1, _kMaxPageSize);
+    final o = offset < 0 ? 0 : offset;
+    return await isar.teams.where().offset(o).limit(l).findAll();
   }
 
-  Future<List<Player>> getAllPlayers() async {
-    return await isar.players.where().findAll();
+  Future<List<Player>> getAllPlayers({int offset = 0, int limit = _kDefaultPageSize}) async {
+    final l = limit.clamp(1, _kMaxPageSize);
+    final o = offset < 0 ? 0 : offset;
+    return await isar.players.where().offset(o).limit(l).findAll();
   }
 
-  Future<List<LeagueFixture>> getAllFixtures() async {
-    return await isar.leagueFixtures.where().findAll();
+  Future<List<LeagueFixture>> getAllFixtures({int offset = 0, int limit = _kDefaultPageSize}) async {
+    final l = limit.clamp(1, _kMaxPageSize);
+    final o = offset < 0 ? 0 : offset;
+    return await isar.leagueFixtures.where().offset(o).limit(l).findAll();
   }
 
-  Future<List<Player>> getPlayersByTeam(int apiId, {bool professionalsOnly = false}) async {
+  /// Count total teams (for pagination UI)
+  Future<int> countTeams() async => await isar.teams.count();
+
+  /// Count total players (for pagination UI)
+  Future<int> countPlayers() async => await isar.players.count();
+
+  Future<List<Player>> getPlayersByTeam(int apiId, {bool professionalsOnly = false, int offset = 0, int limit = _kDefaultPageSize}) async {
+    final l = limit.clamp(1, _kMaxPageSize);
+    final o = offset < 0 ? 0 : offset;
     var q = isar.players.filter().teamApiIdEqualTo(apiId);
     if (professionalsOnly) {
-      return q.isYouthEqualTo(false).findAll();
+      return q.isYouthEqualTo(false).offset(o).limit(l).findAll();
     }
-    return q.findAll();
+    return q.offset(o).limit(l).findAll();
+  }
+
+  /// Count players by team (for pagination UI)
+  Future<int> countPlayersByTeam(int apiId, {bool professionalsOnly = false}) async {
+    var q = isar.players.filter().teamApiIdEqualTo(apiId);
+    if (professionalsOnly) {
+      return q.isYouthEqualTo(false).count();
+    }
+    return q.count();
   }
 
   Future<bool> expandStadium({int extraSeats = 5000, double cost = 2500000}) async {
-    final finance = await isar.clubFinances.get(1);
-    if (finance == null || finance.balance < cost) return false;
+    return await isar.writeTxn(() async {
+      final finance = await isar.clubFinances.get(1);
+      if (finance == null || finance.balance < cost) return false;
 
-    finance.balance -= cost;
-    finance.stadiumExtraCapacity += extraSeats;
+      finance.balance -= cost;
+      finance.stadiumExtraCapacity += extraSeats;
 
-    await isar.writeTxn(() => isar.clubFinances.put(finance));
-    return true;
+      await isar.clubFinances.put(finance);
+      return true;
+    });
   }
 
   Future<int> effectiveStadiumCapacity(Team team) async {

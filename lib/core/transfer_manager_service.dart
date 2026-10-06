@@ -32,8 +32,12 @@ class TransferManagerService {
     final save = await isar.gameSaves.get(1);
     if (finance == null || save == null) return 'Error de sistema.';
 
-    // Verificar que podemos pagar
-    if (offerAmount > finance.balance + finance.transferBudget) {
+    // Verificar que podemos pagar: balance y transferBudget no son
+    // independientes (el presupuesto sale de caja). No sumar ambos.
+    final maxPayable = finance.balance > finance.transferBudget
+        ? finance.balance
+        : finance.transferBudget;
+    if (offerAmount > maxPayable) {
       return 'No tienes presupuesto suficiente.';
     }
 
@@ -78,6 +82,7 @@ class TransferManagerService {
     final player = await isar.players.get(offer.playerId);
     if (player == null) return 'Jugador no encontrado.';
 
+    // Único punto donde se cuenta la ronda del usuario.
     offer.previousOffers.add(offer.amount);
     offer.amount = newAmount;
     offer.negotiationRounds++;
@@ -114,11 +119,10 @@ class TransferManagerService {
         type: MessageType.transfer,
       );
     } else if (_rng.nextDouble() < 0.7 && offer.negotiationRounds < 3) {
-      // Contraoferta de ellos
+      // Contraoferta de ellos: misma ronda, no sumar de nuevo
+      // (negotiateOffer ya contó la ronda del usuario).
       final counterAmount = offer.amount * (0.95 + _rng.nextDouble() * 0.15);
-      offer.previousOffers.add(offer.amount);
       offer.amount = counterAmount;
-      offer.negotiationRounds++;
       offer.status = OfferStatus.negotiating;
 
       await MessageService(isar).add(
@@ -204,24 +208,31 @@ class TransferManagerService {
     String? position,
     double maxPrice = double.infinity,
     int minRating = 0,
+    int limit = 50,
   }) async {
-    final allPlayers = await isar.players
+    var q = isar.players
         .filter()
         .teamApiIdGreaterThan(0)
         .isYouthEqualTo(false)
-        .findAll();
+        .loanedOutToTeamApiIdEqualTo(0);
 
-    final filtered = allPlayers.where((p) {
+    if (position != null) {
+      q = q.positionEqualTo(position);
+    }
+
+    // Apply price and rating filters via where clause (Isar doesn't support these directly in filter)
+    // We'll do a limited query then filter
+    final candidates = await q.limit(limit * 3).findAll();
+
+    final filtered = candidates.where((p) {
       if (p.teamApiId == userTeamApiId) return false;
-      if (p.loanedOutToTeamApiId != 0) return false;
-      if (position != null && p.position != position) return false;
       if (p.marketValue > maxPrice) return false;
       if (p.average < minRating) return false;
       return true;
     }).toList();
 
     filtered.sort((a, b) => b.average.compareTo(a.average));
-    return filtered;
+    return filtered.take(limit).toList();
   }
 
   // === RECOMENDACIONES DE FICHAJE ===
@@ -250,19 +261,27 @@ class TransferManagerService {
       }
     });
 
-    // Buscar jugadores en esas posiciones
+    // Buscar jugadores en esas posiciones - single query with OR
     final recommendations = <Player>[];
     final finance = await isar.clubFinances.get(1);
     final budget = finance?.transferBudget ?? 10000000;
 
-    for (final pos in weakPositions) {
-      final candidates = await getAvailablePlayers(
-        userTeamApiId,
-        position: pos,
-        maxPrice: budget * 1.5,
-        minRating: 60,
-      );
-      recommendations.addAll(candidates.take(3));
+    // Fetch all candidates for weak positions in one go
+    if (weakPositions.isNotEmpty) {
+      final candidates = await isar.players
+          .filter()
+          .teamApiIdGreaterThan(0)
+          .isYouthEqualTo(false)
+          .loanedOutToTeamApiIdEqualTo(0)
+          .findAll();
+
+      for (final pos in weakPositions) {
+        final posCandidates = candidates
+            .where((p) => p.teamApiId != userTeamApiId && p.position == pos && p.marketValue <= budget * 1.5 && p.average >= 60)
+            .toList();
+        posCandidates.sort((a, b) => b.average.compareTo(a.average));
+        recommendations.addAll(posCandidates.take(3));
+      }
     }
 
     // Añadir algunas joyas si hay presupuesto
@@ -271,11 +290,14 @@ class TransferManagerService {
         userTeamApiId,
         maxPrice: budget,
         minRating: 75,
+        limit: 2,
       );
-      recommendations.addAll(gems.take(2));
+      recommendations.addAll(gems);
     }
 
-    return recommendations;
+    // Deduplicate by player ID
+    final seen = <int>{};
+    return recommendations.where((p) => seen.add(p.id)).toList();
   }
 
   // === INTERCAMBIOS ===

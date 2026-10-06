@@ -1,22 +1,17 @@
 import 'package:isar/isar.dart';
-import '../models/cup_fixture.dart';
 import '../models/game_save.dart';
 import '../models/game_message.dart';
-import '../models/league_standing.dart';
 import '../models/player_model.dart';
 import '../models/staff_member.dart';
 import '../models/team.dart';
 import '../models/finance_model.dart';
 import '../models/league_fixture.dart';
-import '../models/transfer_offer.dart';
-import '../models/user_lineup.dart';
 import 'league_service.dart';
 import 'message_service.dart';
 import 'calendar_service.dart';
 import 'board_service.dart';
 import 'youth_service.dart';
 import 'squad_service.dart';
-import 'package:flutter/foundation.dart';
 
 class GameSessionService {
   final Isar isar;
@@ -123,13 +118,14 @@ class GameSessionService {
 
     await BoardService(isar).assignObjectives(save, userTeam);
 
+    await SquadService(isar).ensureAllTeams();
+    await SquadService(isar).ensureSquad(userTeam.apiId);
+
     await isar.writeTxn(() async {
       await isar.gameSaves.put(save);
       await _initClubFinances(userTeam);
     });
 
-    await SquadService(isar).ensureAllTeams();
-    await SquadService(isar).ensureSquad(userTeam.apiId);
     await CalendarService(isar).initCupForSeason(userTeam.apiId);
     
     await YouthService(isar).scoutYouth(teamApiId: userTeam.apiId, count: 4);
@@ -244,6 +240,8 @@ class GameSessionService {
   Future<double> trainingMultiplier() async {
     final save = await getSave();
     if (save == null) return 1.0;
-    return 1.0 + (save.staffPreparatorLevel - 1) * 0.08;
+    // Nivel 0 (sin preparador) → tratar como 1 (base) para no penalizar.
+    final level = save.staffPreparatorLevel <= 1 ? 1 : save.staffPreparatorLevel;
+    return 1.0 + (level - 1) * 0.08;
   }
 }

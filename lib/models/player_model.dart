@@ -39,6 +39,7 @@ class Player {
   int suspendedMatches = 0;
 
   /// Jugador de cantera (no cuenta en plantilla profesional hasta promoción)
+  @Index()
   bool isYouth = false;
 
   int contractYearsRemaining = 3;

@@ -65,13 +65,15 @@ class TrainingEngine {
       if (a.age <= 21) scoreA += 5;
       if (b.age <= 21) scoreB += 5;
 
-      // Calcular margen respecto a su cap estimado
-      final capA = a.potential.clamp(75, 99);
-      final capB = b.potential.clamp(75, 99);
+      // Calcular margen respecto a su cap estimado (con guarda stats).
+      final capA = a.potential.clamp(75, 99).toInt();
+      final capB = b.potential.clamp(75, 99).toInt();
       final indexFocus = _getFocusStatIndex(randomFocus);
 
-      scoreA += (capA - a.stats[indexFocus]);
-      scoreB += (capB - b.stats[indexFocus]);
+      final statA = (a.stats.length > indexFocus) ? a.stats[indexFocus] : 0;
+      final statB = (b.stats.length > indexFocus) ? b.stats[indexFocus] : 0;
+      scoreA += (capA - statA);
+      scoreB += (capB - statB);
 
       return scoreB.compareTo(scoreA); // De mayor a menor puntuación de prioridad
     });
@@ -111,27 +113,29 @@ class TrainingEngine {
 
     await isar.writeTxn(() async {
       for (var player in players) {
+        final statIndex = _getFocusStatIndex(focus);
+        final statName = _getStatLabel(statIndex);
+        // Guarda ante datos corruptos: stats debe tener 5 entradas.
+        if (player.stats.length <= statIndex) continue;
         double multiplier = player.personality == Personality.ambitious ? 1.2 : 1.0;
         multiplier *= staffMultiplier;
 
         if (player.isUnicorn) multiplier *= 1.85;
         if (player.age <= 21) multiplier *= 1.15;
 
-        final statIndex = _getFocusStatIndex(focus);
-        final statName = _getStatLabel(statIndex);
         final oldStat = player.stats[statIndex];
         int newStat = oldStat;
         bool hasImproved = false;
 
         if (_random.nextDouble() * multiplier > 0.55) {
-          final cap = player.potential.clamp(75, 99);
+          final cap = player.potential.clamp(75, 99).toInt();
           if (oldStat < cap) {
             final newStats = List<int>.from(player.stats);
             var gain = 1;
             if (player.isUnicorn && player.age <= 20 && _random.nextDouble() < 0.35) {
               gain = 2;
             }
-            newStat = (oldStat + gain).clamp(1, cap);
+            newStat = (oldStat + gain).clamp(1, cap).toInt();
             newStats[statIndex] = newStat;
             player.stats = newStats;
             hasImproved = true;

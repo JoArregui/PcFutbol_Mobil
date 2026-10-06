@@ -26,12 +26,18 @@ class ApiService {
   final String baseUrl = 'https://v3.football.api-sports.io';
   final _rng = Random();
 
+  /// HTTP client with timeout to prevent hanging
+  final _httpClient = http.Client();
+
   Map<String, String> get _headers => {
         'x-apisports-key': apiKey,
         'Content-Type': 'application/json',
       };
 
   static const _seasonsToTry = ['2024', '2023', '2025'];
+  static const _requestTimeout = Duration(seconds: 10);
+  // API-Sports tiene rate-limit ~10 req/min en plan gratuito → ≥6200ms entre peticiones.
+  static const _interTeamDelay = Duration(milliseconds: 6500);
 
   /// Sincroniza equipos de la liga SOLAMENTE si la BD está VACÍA.
   /// Si ya hay equipos guardados, NUNCA consulta la API - solo usa la BD.
@@ -63,10 +69,10 @@ class ApiService {
       int leagueId, String season, DatabaseService db) async {
     debugPrint('📡 GET teams?league=$leagueId&season=$season');
 
-    final response = await http.get(
+    final response = await _httpClient.get(
       Uri.parse('$baseUrl/teams?league=$leagueId&season=$season'),
       headers: _headers,
-    );
+    ).timeout(_requestTimeout);
 
     if (response.statusCode != 200) {
       debugPrint('❌ teams HTTP ${response.statusCode}');
@@ -86,38 +92,46 @@ class ApiService {
       await db.saveTeam(newTeam);
       await syncTeamSquad(newTeam.apiId, db);
       if (i < teamsRaw.length - 1) {
-        await Future.delayed(const Duration(milliseconds: 450));
+        await Future.delayed(_interTeamDelay);
       }
     }
 
     return true;
   }
 
-  /// Sincroniza la plantilla de un equipo SOLAMENTE si NO tiene jugadores en BD.
-  /// Si ya hay jugadores guardados, NUNCA consulta la API - solo usa la BD.
+  /// Sincroniza la plantilla de un equipo desde la API.
+  /// - sin force: si ya hay ≥15 jugadores en BD, no toca nada (datos locales).
+  /// - con force: CONSULTA la API; si la API falla y había reales existentes
+  ///   en la BD, NO los borra — solo se complementa (ver _fallbackGeneratedSquad).
   Future<void> syncTeamSquad(int teamId, DatabaseService db,
       {bool force = false}) async {
-    
-    // 🔒 SI HAY JUGADORES EN LA BD: NO USAR API - SALIR INMEDIATAMENTE
+
+    final existing = await db.getPlayersByTeam(teamId);
+    final existingReals = existing.where((p) => !p.isGenerated && !p.isYouth).length;
+
+    // 🔒 SIN force: si hay ≥15 jugadores locales, no consultamos API
     if (!force) {
-      final existing = await db.getPlayersByTeam(teamId);
       if (existing.length >= 15) {
-        debugPrint('✅ Equipo $teamId: ${existing.length} jugadores en BD. No se consulta API.');
+        debugPrint(
+            '✅ Equipo $teamId: ${existing.length} jugadores locales ($existingReals reales). No se consulta API.');
         return;
       }
+    } else {
+      debugPrint(
+          '🔄 FORCE syncTeamSquad[$teamId]: ${existing.length} existentes ($existingReals reales). Consultando API…');
     }
 
-    // Solo consultamos API si no hay jugadores suficientes (primera vez)
+    // Sin API key → fallback inteligente (preserva reales si hay)
     if (apiKey.isEmpty) {
       await _fallbackGeneratedSquad(teamId, db);
       return;
     }
 
     try {
-      final response = await http.get(
+      final response = await _httpClient.get(
         Uri.parse('$baseUrl/players/squads?team=$teamId'),
         headers: _headers,
-      );
+      ).timeout(_requestTimeout);
 
       if (response.statusCode != 200) {
         debugPrint('⚠️ squads team=$teamId → HTTP ${response.statusCode}');
@@ -184,9 +198,21 @@ class ApiService {
               ? 88 + _rng.nextInt(8)
               : _ceilingFromStats(stats, age));
       }
-      await db.replaceTeamSquad(teamId, players);
+
+      if (force && existingReals > 0 && players.length < existingReals) {
+        debugPrint(
+            '⚠️ API devolvió ${players.length} pero ya teníamos $existingReals reales locales. Preservamos los locales + fusionamos API.');
+        final merged = <Player>[
+          ...existing.where((p) => !p.isGenerated && !p.isYouth),
+          ...players,
+        ];
+        await db.replaceTeamSquad(teamId, merged);
+      } else {
+        await db.replaceTeamSquad(teamId, players);
+      }
+
       debugPrint(
-          '✅ Equipo $teamId: ${players.length} jugadores reales guardados en BD');
+          '✅ Equipo $teamId: ${players.length} jugadores reales guardados en BD (force=$force)');
     } catch (e) {
       debugPrint('❌ squads team=$teamId: $e');
       await _fallbackGeneratedSquad(teamId, db);
@@ -194,15 +220,48 @@ class ApiService {
   }
 
   Future<void> _fallbackGeneratedSquad(int teamId, DatabaseService db) async {
-    final squad = PlayerGenerator.generateFullSquad(teamId, seasonNumber: 1);
-    await db.replaceTeamSquad(teamId, squad);
+    final existing = await db.getPlayersByTeam(teamId);
+    final realExisting = existing.where((p) => !p.isGenerated && !p.isYouth).toList();
+    const desiredTotal = 24;
+
+    if (realExisting.length >= 18) {
+      debugPrint(
+          '🎲 Fallback: ya hay ${realExisting.length} reales en $teamId — no machacamos nada.');
+      return;
+    }
+
+    final squad = <Player>[];
+    final neededReal = (desiredTotal * 0.75).ceil() - realExisting.length;
+    final neededGen = desiredTotal - realExisting.length - neededReal.clamp(0, desiredTotal);
+
     debugPrint(
-        '🎲 Plantilla inventada para $teamId (${squad.length} jugadores)');
+        '🎲 Fallback para $teamId: rellenando con ${neededReal.clamp(0, 99)} reales suplementarios + ${neededGen.clamp(0, 99)} generados (ya tengo ${realExisting.length} reales existentes)');
+
+    for (var i = 0; i < neededReal.clamp(0, 99); i++) {
+      final p = PlayerGenerator.generateSupplementalPlayers(teamId, 1, seasonNumber: 1).first;
+      p.isGenerated = false;
+      squad.add(p);
+    }
+    for (var i = 0; i < neededGen.clamp(0, 99); i++) {
+      final p = PlayerGenerator.generateSupplementalPlayers(teamId, 1, seasonNumber: 1).first;
+      squad.add(p);
+    }
+
+    if (realExisting.isEmpty) {
+      await db.replaceTeamSquad(teamId, squad);
+    } else {
+      final players = <Player>[...realExisting, ...squad];
+      await db.replaceTeamSquad(teamId, players);
+    }
+  }
+
+  void dispose() {
+    _httpClient.close();
   }
 
   int _parseAge(dynamic age) {
-    if (age is int) return age.clamp(16, 42);
-    if (age is String) return int.tryParse(age)?.clamp(16, 42) ?? 22;
+    if (age is int) return age.clamp(16, 42).toInt();
+    if (age is String) return int.tryParse(age)?.clamp(16, 42).toInt() ?? 22;
     return 22;
   }
 

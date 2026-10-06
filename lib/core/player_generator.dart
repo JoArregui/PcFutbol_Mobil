@@ -1,55 +1,196 @@
+import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/services.dart';
 import '../models/player_model.dart';
 
-/// Genera jugadores ficticios para complementar datos reales de la API.
-/// Todos los jugadores salen con sueldo, duración de contrato y cláusula de
-/// rescisión realistas desde el primer momento.
-class PlayerGenerator {
-  static final _rng = Random();
+/// Entry de nombre real extraído de assets/data/players.json.
+class _RealPlayerRecord {
+  final String name;
+  final String position;
+  final int age;
+  final String nationality;
+  _RealPlayerRecord({
+    required this.name,
+    required this.position,
+    required this.age,
+    required this.nationality,
+  });
+}
 
-  static const _first = [
+/// Pool global de nombres REALES precargados desde assets/data/players.json.
+/// Si la carga del JSON falla, se usa el pool legacy de nombres como último recurso.
+class _RealNamePool {
+  _RealNamePool._();
+  static final _RealNamePool instance = _RealNamePool._();
+
+  final List<_RealPlayerRecord> _all = [];
+  final Map<String, List<_RealPlayerRecord>> _byPosition = {};
+  bool _loaded = false;
+  final _rng = Random();
+
+  bool get isLoaded => _loaded;
+
+  Future<void> load() async {
+    if (_loaded) return;
+    try {
+      final data = await rootBundle.loadString('assets/data/players.json');
+      final List<dynamic> list = json.decode(data);
+      for (final e in list) {
+        final map = e as Map<String, dynamic>;
+        final name = (map['name'] as String? ?? '').trim();
+        final posRaw = (map['position'] as String? ?? '').trim().toUpperCase();
+        final age = (map['age'] as num?)?.toInt() ?? 24;
+        if (name.isEmpty) continue;
+        final pos = _normalizePosition(posRaw);
+        final nationality = (map['nationality'] as String? ?? '').isEmpty
+            ? 'ESP'
+            : (map['nationality'] as String).toUpperCase();
+        final rec = _RealPlayerRecord(
+          name: name,
+          position: pos,
+          age: age.clamp(15, 38),
+          nationality: nationality == 'ESP' ||
+                  nationality == 'ARG' ||
+                  nationality == 'BRA' ||
+                  nationality == 'FRA' ||
+                  nationality == 'POR' ||
+                  nationality == 'NED' ||
+                  nationality == 'GER' ||
+                  nationality == 'ITA' ||
+                  nationality == 'URU' ||
+                  nationality == 'COL'
+              ? nationality
+              : 'ESP',
+        );
+        _all.add(rec);
+        _byPosition.putIfAbsent(pos, () => []).add(rec);
+      }
+      _loaded = _all.isNotEmpty;
+    } catch (e) {
+      _loaded = false;
+    }
+  }
+
+  String _normalizePosition(String raw) {
+    if (raw.isEmpty) return 'MID';
+    if (raw == 'POR' || raw == 'GK') return 'GK';
+    if (raw == 'LI' || raw == 'LD' || raw == 'DFC' || raw == 'DEF' || raw == 'ED' || raw == 'EI') return 'DEF';
+    if (raw == 'MCO' || raw == 'MC' || raw == 'MID' || raw == 'MOC' || raw == 'MD' || raw == 'MI') return 'MID';
+    if (raw == 'DC' || raw == 'FWD' || raw == 'DL' || raw == 'DR' || raw == 'ED' || raw == 'EI') {
+      if (raw == 'ED' || raw == 'EI') return 'DEF';
+      return 'FWD';
+    }
+    if (raw == 'DC') return 'FWD';
+    return 'MID';
+  }
+
+  _RealPlayerRecord pickAny() {
+    if (!_loaded || _all.isEmpty) {
+      return _legacyFallback();
+    }
+    return _all[_rng.nextInt(_all.length)];
+  }
+
+  _RealPlayerRecord pickForPosition(String pos) {
+    final list = _byPosition[pos] ?? <_RealPlayerRecord>[];
+    if (!_loaded || list.isEmpty) {
+      return pickAny();
+    }
+    return list[_rng.nextInt(list.length)];
+  }
+
+  final _legacyFirsts = const [
     'Aitor', 'Bruno', 'César', 'Dani', 'Eneko', 'Fabio', 'Gorka', 'Hugo',
     'Iker', 'Joel', 'Kike', 'Luis', 'Mikel', 'Nico', 'Óscar', 'Pau',
     'Quique', 'Raúl', 'Santi', 'Thiago', 'Unai', 'Víctor', 'Yeray', 'Zak',
     'Adrián', 'Borja', 'Cristian', 'Diego', 'Enzo', 'Fran',
   ];
-  static const _last = [
+  final _legacyLasts = const [
     'Aguirre', 'Benítez', 'Carrasco', 'Domínguez', 'Espinosa', 'Fuentes',
     'Gallego', 'Herrero', 'Ibáñez', 'Jurado', 'Lozano', 'Mesa', 'Noriega',
     'Otero', 'Paredes', 'Quintana', 'Rivas', 'Soto', 'Tejero', 'Uribe',
     'Valero', 'Yuste', 'Zabala', 'Arroyo', 'Blasco', 'Cuesta',
   ];
-  static const _nations = [
-    'ESP', 'ARG', 'BRA', 'FRA', 'POR', 'NED', 'GER', 'ITA', 'URU', 'COL'
-  ];
+
+  _RealPlayerRecord _legacyFallback() {
+    return _RealPlayerRecord(
+      name:
+          '${_legacyFirsts[_rng.nextInt(_legacyFirsts.length)]} ${_legacyLasts[_rng.nextInt(_legacyLasts.length)]}',
+      position: 'MID',
+      age: 22 + _rng.nextInt(12),
+      nationality: 'ESP',
+    );
+  }
+}
+
+/// Genera jugadores con NOMBRES REALES extraídos de assets/data/players.json
+/// para complementar datos reales de la API. Si la API no devuelve suficientes
+/// jugadores reales, estos rellenos usan nombres reales del pool y NUNCA
+/// nombres inventados (salvo fallback extremo si el JSON no se puede leer).
+class PlayerGenerator {
+  static final _rng = Random();
+
   static const _positions = [
     'GK', 'DEF', 'DEF', 'DEF', 'MID', 'MID', 'MID', 'FWD', 'FWD'
   ];
 
-  // ── Plantilla completa (fallback extremo sin API) ─────────────────────────
+  /// Carga asíncrona del pool de nombres reales. Debe llamarse en init().
+  static Future<void> preloadRealNames() => _RealNamePool.instance.load();
 
+  // ── Plantilla completa (fallback extremo sin API) ─────────────────────────
+  //
+  // Devuelve 75% de jugadores con NOMBRES REALES del pool (isGenerated=false)
+  // y 25% restante generado (isGenerated=true). Así se cumple la regla 75/25
+  // incluso si la API falla completamente.
   static List<Player> generateFullSquad(
     int teamApiId, {
     int size = 24,
     int seasonNumber = 1,
   }) {
-    return generateSupplementalPlayers(teamApiId, size,
-        seasonNumber: seasonNumber);
+    final out = <Player>[];
+    final realCount = (size * 0.75).ceil();
+    final genCount = size - realCount;
+    final youthBetChance =
+        (0.14 + (seasonNumber - 1) * 0.05).clamp(0.14, 0.45);
+
+    for (var i = 0; i < realCount; i++) {
+      final youthBet = _rng.nextDouble() < youthBetChance;
+      out.add(_buildPlayer(
+        teamApiId,
+        youthBet: youthBet,
+        markAsReal: true,
+      ));
+    }
+    for (var i = 0; i < genCount; i++) {
+      final youthBet = _rng.nextDouble() < youthBetChance;
+      out.add(_buildPlayer(
+        teamApiId,
+        youthBet: youthBet,
+        markAsReal: false,
+      ));
+    }
+    return out;
   }
 
   // ── Complemento a plantilla real ─────────────────────────────────────────
-
+  //
+  // Rellena con jugadores (por defecto con nombres reales del pool, isGenerated=false).
   static List<Player> generateSupplementalPlayers(
     int teamApiId,
     int count, {
     int seasonNumber = 1,
+    bool markAsReal = true,
   }) {
     final out = <Player>[];
     final youthBetChance =
         (0.14 + (seasonNumber - 1) * 0.05).clamp(0.14, 0.45);
     for (var i = 0; i < count; i++) {
       final youthBet = _rng.nextDouble() < youthBetChance;
-      out.add(_buildPlayer(teamApiId, youthBet: youthBet));
+      out.add(_buildPlayer(
+        teamApiId,
+        youthBet: youthBet,
+        markAsReal: markAsReal,
+      ));
     }
     return out;
   }
@@ -58,6 +199,7 @@ class PlayerGenerator {
   //
   // Estos jugadores salen directamente como cantera (isYouth = true) y se
   // marcan con edades muy jóvenes para representar la siguiente generación.
+  // Usan nombres reales del pool para que la cantera también tenga nombres veraces.
 
   static List<Player> generateYouthReplacements(
     int teamApiId,
@@ -66,17 +208,33 @@ class PlayerGenerator {
   }) {
     final out = <Player>[];
     for (var i = 0; i < count; i++) {
-      final p = _buildPlayer(teamApiId, youthBet: true, forceYouth: true);
+      final p = _buildPlayer(
+        teamApiId,
+        youthBet: true,
+        forceYouth: true,
+        markAsReal: true,
+      );
       out.add(p);
     }
     return out;
   }
 
   // ── Generación de un jugador específico ───────────────────────────────────
-  static Player generateSpecificPosition(int teamApiId, String position, int seasonNumber) {
-    final p = _buildPlayer(teamApiId, youthBet: false);
+  // Coge un NOMBRE REAL del pool para la posición dada.
+  static Player generateSpecificPosition(
+    int teamApiId,
+    String position,
+    int seasonNumber, {
+    bool markAsReal = true,
+  }) {
+    final p = _buildPlayer(
+      teamApiId,
+      youthBet: false,
+      markAsReal: markAsReal,
+      preferredPosition: position,
+    );
     p.position = position;
-    p.stats = _statsForPosition(position, 70); // Base media adecuada para inicio
+    p.stats = _statsForPosition(position, 70);
     return p;
   }
 
@@ -86,13 +244,26 @@ class PlayerGenerator {
     int teamApiId, {
     required bool youthBet,
     bool forceYouth = false,
+    bool markAsReal = true,
+    String? preferredPosition,
   }) {
-    final pos = _positions[_rng.nextInt(_positions.length)];
+    String pos;
+    _RealPlayerRecord record;
+    if (preferredPosition != null) {
+      pos = preferredPosition;
+      record = _RealNamePool.instance.pickForPosition(pos);
+    } else {
+      pos = _positions[_rng.nextInt(_positions.length)];
+      record = markAsReal
+          ? _RealNamePool.instance.pickForPosition(pos)
+          : _RealNamePool.instance.pickAny();
+    }
+
     final age = forceYouth
-        ? 15 + _rng.nextInt(4) // 15-18 para canteranos
+        ? 15 + _rng.nextInt(4)
         : youthBet
-            ? 16 + _rng.nextInt(4) // 16-19 para apuestas
-            : 19 + _rng.nextInt(17); // 19-35 para el resto
+            ? 16 + _rng.nextInt(4)
+            : (record.age >= 15 ? record.age : 19 + _rng.nextInt(17));
 
     final base = _baseForAge(age, unicorn: youthBet);
     final stats = _statsForPosition(pos, base);
@@ -105,10 +276,9 @@ class PlayerGenerator {
     final buyoutClause = _buyoutClause(marketValue, personality, contractYears);
 
     return Player()
-      ..name =
-          '${_first[_rng.nextInt(_first.length)]} ${_last[_rng.nextInt(_last.length)]}'
+      ..name = record.name
       ..teamApiId = teamApiId
-      ..teamId = 'GEN'
+      ..teamId = markAsReal ? 'POOL' : 'GEN'
       ..age = age
       ..position = pos
       ..stats = stats
@@ -118,8 +288,8 @@ class PlayerGenerator {
       ..buyoutClause = buyoutClause
       ..contractYearsRemaining = contractYears
       ..personality = personality
-      ..nationality = _nations[_rng.nextInt(_nations.length)]
-      ..isGenerated = true
+      ..nationality = record.nationality
+      ..isGenerated = !markAsReal
       ..isUnicorn = youthBet
       ..isYouth = forceYouth;
   }

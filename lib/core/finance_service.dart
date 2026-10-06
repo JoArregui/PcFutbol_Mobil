@@ -88,7 +88,8 @@ class FinanceService {
     await isar.writeTxn(() async {
       finance.balance += salePrice;
       finance.transferBudget += salePrice * 0.6;
-      finance.wageBill = (finance.wageBill - player.salary).clamp(0, double.infinity);
+      finance.wageBill =
+          (finance.wageBill - player.salary).clamp(0, double.infinity).toDouble();
       await isar.clubFinances.put(finance);
       await isar.players.delete(player.id);
     });
@@ -125,11 +126,10 @@ class FinanceService {
       }
     }
 
-    // Aplicar todos los gastos operativos del club al balance total
+    // Aplicar todos los gastos operativos del club al balance total.
+    // NOTA: se permite balance negativo para que FinancialGuardService
+    // y BoardService puedan detectar semanas en números rojos y despedir.
     finance.balance -= (staffCost + weeklyWages + weeklyLoanPayment);
-    if (finance.balance < 0) {
-      finance.balance = 0;
-    }
 
     await isar.writeTxn(() => isar.clubFinances.put(finance));
   }

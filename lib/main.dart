@@ -104,8 +104,13 @@ import 'screens/splash_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Cargamos variables de entorno antes de lanzar la App
-  await dotenv.load(fileName: "assets/.env");
+  // Cargamos variables de entorno sin tumbar la app si falta assets/.env
+  // (p.ej. release/web). ApiService usa fallback generado si no hay key.
+  try {
+    await dotenv.load(fileName: "assets/.env");
+  } catch (e) {
+    debugPrint("⚠️ No se pudo cargar assets/.env: $e. Se sigue con fallback local.");
+  }
 
   runApp(const PCFutbol2026());
 }

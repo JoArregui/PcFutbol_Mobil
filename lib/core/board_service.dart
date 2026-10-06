@@ -387,7 +387,9 @@ class BoardService {
     );
 
     const double baseDismissalChance = 0.35;
-    final double secretaryReduction = (save.staffSecretaryLevel - 1) * 0.03;
+    // Nivel 0 (sin secretario) → tratar como 1 (base).
+    final secLevel = save.staffSecretaryLevel <= 1 ? 1 : save.staffSecretaryLevel;
+    final double secretaryReduction = (secLevel - 1) * 0.03;
     final double dismissalChance = (baseDismissalChance - secretaryReduction).clamp(0.05, 0.9);
 
     if (!ok && _rng.nextDouble() < dismissalChance) {

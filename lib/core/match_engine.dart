@@ -113,9 +113,10 @@ class MatchEngine {
           type: EventType.goal,
           isHomeTeam: true,
           description:
-              "¡GOOOOL! ${scorer.name} (${home.name}). $homeScore - $awayScore",
+              "¡GOOOOL! ${scorer?.name ?? 'Remate en propia puerta'} (${home.name}). $homeScore - $awayScore",
           homeScore: homeScore,
           awayScore: awayScore,
+          playerId: scorer?.id,
         ));
       } else if (roll < 0.11 * homeBias + 0.04) {
         if (_rng.nextDouble() < homeConcedeBias * 0.85 + 0.08) {
@@ -126,9 +127,10 @@ class MatchEngine {
             type: EventType.goal,
             isHomeTeam: false,
             description:
-                "¡GOOOOL! ${scorer.name} (${away.name}). $homeScore - $awayScore",
+                "¡GOOOOL! ${scorer?.name ?? 'Remate en propia puerta'} (${away.name}). $homeScore - $awayScore",
             homeScore: homeScore,
             awayScore: awayScore,
+            playerId: scorer?.id,
           ));
         }
       } else if (roll < 0.16) {
@@ -235,7 +237,8 @@ class MatchEngine {
       kickoffMessage: kickoffMessage,
     );
 
-    final delayMs = (400 / speedMultiplier).round().clamp(60, 1500);
+    final safeSpeed = speedMultiplier <= 0 ? 1.0 : speedMultiplier;
+    final delayMs = (400 / safeSpeed).round().clamp(60, 1500);
 
     for (final event in timeline) {
       if (event.minute > 0) {
@@ -280,9 +283,11 @@ class MatchEngine {
     return pool.map((p) => p.average).reduce((a, b) => a + b) / pool.length;
   }
 
-  Player _pickScorer(List<Player> players) {
+  Player? _pickScorer(List<Player> players) {
+    if (players.isEmpty) return null;
     final forwards = players.where((p) => p.position == 'FWD').toList();
     final pool = forwards.isNotEmpty ? forwards : players;
+    if (pool.isEmpty) return null;
     return pool[_rng.nextInt(pool.length)];
   }
 
@@ -292,22 +297,28 @@ class MatchEngine {
     required List<Player> homePlayers,
     required List<Player> awayPlayers,
   }) {
-    // Inicializar stats de jugadores
-    final homeStats = homePlayers.map((p) => PlayerMatchStats(
-      playerId: p.id,
-      playerName: p.name,
-      position: p.position,
-      minutesPlayed: 90,
-      rating: 5.0 + _rng.nextDouble() * 4.0,
-    )).toList();
+    // Inicializar stats de jugadores usando Map para O(1) lookup
+    final homeStatsMap = <int, PlayerMatchStats>{};
+    for (final p in homePlayers) {
+      homeStatsMap[p.id] = PlayerMatchStats(
+        playerId: p.id,
+        playerName: p.name,
+        position: p.position,
+        minutesPlayed: 90,
+        rating: 5.0 + _rng.nextDouble() * 4.0,
+      );
+    }
 
-    final awayStats = awayPlayers.map((p) => PlayerMatchStats(
-      playerId: p.id,
-      playerName: p.name,
-      position: p.position,
-      minutesPlayed: 90,
-      rating: 5.0 + _rng.nextDouble() * 4.0,
-    )).toList();
+    final awayStatsMap = <int, PlayerMatchStats>{};
+    for (final p in awayPlayers) {
+      awayStatsMap[p.id] = PlayerMatchStats(
+        playerId: p.id,
+        playerName: p.name,
+        position: p.position,
+        minutesPlayed: 90,
+        rating: 5.0 + _rng.nextDouble() * 4.0,
+      );
+    }
 
     int homeGoals = 0;
     int awayGoals = 0;
@@ -338,24 +349,27 @@ class MatchEngine {
           awayShotsOnTarget++;
         }
 
-        // Actualizar stats del jugador
-        if (event.isHomeTeam == true) {
-          final idx = homeStats.indexWhere((s) => s.playerId == event.playerId);
-          if (idx != -1) {
-            homeStats[idx] = homeStats[idx].copyWith(
-              goals: homeStats[idx].goals + 1,
-              shotsOnTarget: homeStats[idx].shotsOnTarget + 1,
-              rating: (homeStats[idx].rating + 1.0).clamp(0.0, 10.0),
-            );
-          }
-        } else {
-          final idx = awayStats.indexWhere((s) => s.playerId == event.playerId);
-          if (idx != -1) {
-            awayStats[idx] = awayStats[idx].copyWith(
-              goals: awayStats[idx].goals + 1,
-              shotsOnTarget: awayStats[idx].shotsOnTarget + 1,
-              rating: (awayStats[idx].rating + 1.0).clamp(0.0, 10.0),
-            );
+        // Actualizar stats del jugador - O(1) lookup
+        final playerId = event.playerId;
+        if (playerId != null) {
+          if (event.isHomeTeam == true) {
+            final stats = homeStatsMap[playerId];
+            if (stats != null) {
+              homeStatsMap[playerId] = stats.copyWith(
+                goals: stats.goals + 1,
+                shotsOnTarget: stats.shotsOnTarget + 1,
+                rating: (stats.rating + 1.0).clamp(0.0, 10.0),
+              );
+            }
+          } else {
+            final stats = awayStatsMap[playerId];
+            if (stats != null) {
+              awayStatsMap[playerId] = stats.copyWith(
+                goals: stats.goals + 1,
+                shotsOnTarget: stats.shotsOnTarget + 1,
+                rating: (stats.rating + 1.0).clamp(0.0, 10.0),
+              );
+            }
           }
         }
       }
@@ -377,22 +391,25 @@ class MatchEngine {
           awayFouls++;
         }
 
-        // Actualizar stats del jugador
-        if (event.isHomeTeam == true) {
-          final idx = homeStats.indexWhere((s) => s.playerId == event.playerId);
-          if (idx != -1) {
-            homeStats[idx] = homeStats[idx].copyWith(
-              yellowCards: event.cardIsRed == true ? homeStats[idx].yellowCards : homeStats[idx].yellowCards + 1,
-              redCard: event.cardIsRed == true ? true : homeStats[idx].redCard,
-            );
-          }
-        } else {
-          final idx = awayStats.indexWhere((s) => s.playerId == event.playerId);
-          if (idx != -1) {
-            awayStats[idx] = awayStats[idx].copyWith(
-              yellowCards: event.cardIsRed == true ? awayStats[idx].yellowCards : awayStats[idx].yellowCards + 1,
-              redCard: event.cardIsRed == true ? true : awayStats[idx].redCard,
-            );
+        // Actualizar stats del jugador - O(1) lookup
+        final playerId = event.playerId;
+        if (playerId != null) {
+          if (event.isHomeTeam == true) {
+            final stats = homeStatsMap[playerId];
+            if (stats != null) {
+              homeStatsMap[playerId] = stats.copyWith(
+                yellowCards: event.cardIsRed == true ? stats.yellowCards : stats.yellowCards + 1,
+                redCard: event.cardIsRed == true ? true : stats.redCard,
+              );
+            }
+          } else {
+            final stats = awayStatsMap[playerId];
+            if (stats != null) {
+              awayStatsMap[playerId] = stats.copyWith(
+                yellowCards: event.cardIsRed == true ? stats.yellowCards : stats.yellowCards + 1,
+                redCard: event.cardIsRed == true ? true : stats.redCard,
+              );
+            }
           }
         }
       }
@@ -407,6 +424,10 @@ class MatchEngine {
         }
       }
     }
+
+    // Convert maps back to lists preserving original player order
+    final homeStats = homePlayers.map((p) => homeStatsMap[p.id]!).toList();
+    final awayStats = awayPlayers.map((p) => awayStatsMap[p.id]!).toList();
 
     return FullMatchStats(
       homeGoals: homeGoals,

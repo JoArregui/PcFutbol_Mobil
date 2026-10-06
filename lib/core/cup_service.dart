@@ -86,6 +86,34 @@ class CupService {
     return await isar.cupFixtures.filter().roundEqualTo(round).findFirst();
   }
 
+  /// Espejo para mantener CupFixture sincronizado con LeagueFixture(copa)
+  /// que es la fuente de verdad de jornada (CalendarService).
+  Future<void> syncMirrorSchedule({
+    required int round,
+    required int homeTeamApiId,
+    required int awayTeamApiId,
+  }) async {
+    final existing = await _userFixture(round);
+    if (existing != null && !existing.played) return;
+    await isar.writeTxn(() => isar.cupFixtures.put(CupFixture()
+      ..round = round
+      ..homeTeamApiId = homeTeamApiId
+      ..awayTeamApiId = awayTeamApiId));
+  }
+
+  Future<void> syncMirrorFromLeague({
+    required int round,
+    required int homeGoals,
+    required int awayGoals,
+  }) async {
+    final f = await _userFixture(round);
+    if (f == null || f.played) return;
+    f.played = true;
+    f.homeGoals = homeGoals;
+    f.awayGoals = awayGoals;
+    await isar.writeTxn(() => isar.cupFixtures.put(f));
+  }
+
   Future<Team?> getCupOpponent(int userTeamApiId) async {
     final f = await getCurrentUserCupFixture();
     if (f == null) return null;
@@ -145,22 +173,38 @@ class CupService {
       final nextRound = save.cupRound + 1;
       final teams = await isar.teams.where().findAll();
       final rivals = teams.where((t) => t.apiId != userTeamApiId).toList();
-      rivals.shuffle(_rng);
-      final nextOpp = rivals.first;
-      final userHome = _rng.nextBool();
+      if (rivals.isEmpty) {
+        // Sin rivales disponibles: no se puede sortear siguiente ronda.
+        // Se marca el fixture actual y se cierra copa para no bloquear jornada.
+        save.inCup = false;
+        await messages.add(
+          title: 'Copa — sin rivales',
+          body: 'No hay rivales disponibles para la siguiente ronda.',
+          type: MessageType.match,
+        );
+      } else {
+        rivals.shuffle(_rng);
+        final nextOpp = rivals.first;
+        final userHome = _rng.nextBool();
 
-      await isar.cupFixtures.put(CupFixture()
-        ..round = nextRound
-        ..homeTeamApiId = userHome ? userTeamApiId : nextOpp.apiId
-        ..awayTeamApiId = userHome ? nextOpp.apiId : userTeamApiId);
+        final nextFixture = CupFixture()
+          ..round = nextRound
+          ..homeTeamApiId = userHome ? userTeamApiId : nextOpp.apiId
+          ..awayTeamApiId = userHome ? nextOpp.apiId : userTeamApiId;
 
-      save.cupRound = nextRound;
-      await messages.add(
-        title: 'Copa — clasificados',
-        body:
-            'Pasan a ${roundName(nextRound)}. El presidente felicita al vestuario.',
-        type: MessageType.match,
-      );
+        // Isar exige writeTxn: se persiste junto al fixture actual al final.
+        // Guardamos temporalmente en una variable local via closure.
+        // Para mantener atomicidad, lo ponemos en txn dedicada aquí:
+        await isar.writeTxn(() => isar.cupFixtures.put(nextFixture));
+
+        save.cupRound = nextRound;
+        await messages.add(
+          title: 'Copa — clasificados',
+          body:
+              'Pasan a ${roundName(nextRound)}. El presidente felicita al vestuario.',
+          type: MessageType.match,
+        );
+      }
     }
 
     await isar.writeTxn(() async {

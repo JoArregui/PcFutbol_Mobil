@@ -1,11 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../core/database_service.dart';
 import '../core/game_session_service.dart';
 import '../core/responsive.dart';
 import 'team_selection_screen.dart';
 import 'main_menu_screen.dart';
-import 'debug_database_screen.dart';
 
 class TitleScreen extends StatefulWidget {
   final DatabaseService dbService;
@@ -108,16 +106,6 @@ class _TitleScreenState extends State<TitleScreen> {
                     const SizedBox(height: 16),
                   ],
                   _btn("NUEVA PARTIDA", !_canContinue, _newGame),
-                  const SizedBox(height: 16),
-                  if (kDebugMode)
-                    _btn("🛠 DEBUG BD", false, () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DebugDatabaseScreen(dbService: widget.dbService),
-                        ),
-                      );
-                    }),
                   const SizedBox(height: 48),
                 ],
               ),

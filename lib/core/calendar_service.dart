@@ -162,6 +162,12 @@ class CalendarService {
     }
   }
 
+  String _safeRoundName(int round) {
+    const names = ['', 'Octavos', 'Cuartos', 'Semifinal', 'Final'];
+    if (round < 1 || round > 4) return 'Copa del Rey';
+    return names[round];
+  }
+
   Future<void> _resolveCup(
     LeagueFixture f,
     int userTeamApiId,
@@ -174,13 +180,12 @@ class CalendarService {
     if (homeGoals == awayGoals) userWon = _rng.nextBool();
 
     final messages = MessageService(isar);
-    final roundNames = ['', 'Octavos', 'Cuartos', 'Semifinal', 'Final'];
 
     if (!userWon) {
       save.inCup = false;
       await messages.add(
         title: 'Eliminados de Copa',
-        body: 'Derrota en ${roundNames[f.cupRound]}. La prensa habla de decepción.',
+        body: 'Derrota en ${_safeRoundName(f.cupRound)}. La prensa habla de decepción.',
         type: MessageType.match,
       );
     } else if (f.cupRound >= 4) {
@@ -193,14 +198,30 @@ class CalendarService {
       );
     } else {
       final next = f.cupRound + 1;
-      save.cupRound = next;
-      final md = cupMatchdays[next]!;
-      await _scheduleCupFixture(userTeamApiId, next, md);
-      await messages.add(
-        title: 'Copa — clasificados',
-        body: 'Pasan a ${roundNames[next]}.',
-        type: MessageType.match,
+      // Guard ante datos corruptos: si next fuera de rango, cerrar copa.
+      if (next < 1 || next > 4) {
+        save.inCup = false;
+      } else {
+        save.cupRound = next;
+        final md = cupMatchdays[next]!;
+        await _scheduleCupFixture(userTeamApiId, next, md);
+        await messages.add(
+          title: 'Copa — clasificados',
+          body: 'Pasan a ${_safeRoundName(next)}.',
+          type: MessageType.match,
+        );
+      }
+    }
+    // Sincronizar CupFixture espejo (CupService) para no tener doble fuente
+    // divergente: marcamos la misma ronda como jugada con el mismo marcador.
+    try {
+      await CupService(isar).syncMirrorFromLeague(
+        round: f.cupRound,
+        homeGoals: homeGoals,
+        awayGoals: awayGoals,
       );
+    } catch (_) {
+      // No bloquear jornada si el espejo falla.
     }
     await isar.writeTxn(() => isar.gameSaves.put(save));
   }
@@ -212,13 +233,25 @@ class CalendarService {
     rivals.shuffle(_rng);
     final opp = rivals.first;
     final userHome = _rng.nextBool();
+    final homeId = userHome ? userTeamApiId : opp.apiId;
+    final awayId = userHome ? opp.apiId : userTeamApiId;
 
     await isar.writeTxn(() => isar.leagueFixtures.put(LeagueFixture()
       ..matchday = matchday
       ..competition = 'copa'
       ..cupRound = round
-      ..homeTeamApiId = userHome ? userTeamApiId : opp.apiId
-      ..awayTeamApiId = userHome ? opp.apiId : userTeamApiId));
+      ..homeTeamApiId = homeId
+      ..awayTeamApiId = awayId));
+    // Espejo en CupFixture con los mismos equipos para la UI de copa.
+    try {
+      await CupService(isar).syncMirrorSchedule(
+        round: round,
+        homeTeamApiId: homeId,
+        awayTeamApiId: awayId,
+      );
+    } catch (_) {
+      // No bloquear si el espejo falla.
+    }
   }
 
   Future<void> initCupForSeason(int userTeamApiId) async {
@@ -265,6 +298,10 @@ class CalendarService {
     }
 
     final position = league.userPositionFromCachePublic(userTeamApiId);
+    // Fallback: si la caché se perdió, intentar lectura directa antes de
+    // mostrar "?".
+    int? shownPos = position;
+    shownPos ??= await league.getUserLeaguePosition(userTeamApiId);
     await MessageService(isar).add(
       title: 'Jornada $md cerrada',
       body: 'Posición en liga: ${position ?? "?"}º.',

@@ -36,45 +36,48 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
   Team? selectedTeam;
   bool _loadingSquad = false;
 
-  int _flippedIndex = -1;
+  // Usamos apiId como clave para que los controllers sean estables
+  // aunque la lista se filtre/reordene (evita leak por índice).
+  int _flippedTeamApiId = -1;
 
   final Map<int, AnimationController> _controllers = {};
   final Map<int, Animation<double>> _animations = {};
 
-  void _initController(int index) {
-    if (_controllers.containsKey(index)) return;
+  void _initController(int teamApiId) {
+    if (_controllers.containsKey(teamApiId)) return;
     final controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
-    _controllers[index] = controller;
-    _animations[index] = CurvedAnimation(
+    _controllers[teamApiId] = controller;
+    _animations[teamApiId] = CurvedAnimation(
       parent: controller,
       curve: Curves.easeInOut,
     );
   }
 
-  void _flipCard(int index) {
-    _initController(index);
+  void _flipCard(Team team) {
+    final key = team.apiId;
+    _initController(key);
 
-    if (_flippedIndex != -1 && _flippedIndex != index) {
-      _controllers[_flippedIndex]?.reverse();
+    if (_flippedTeamApiId != -1 && _flippedTeamApiId != key) {
+      _controllers[_flippedTeamApiId]?.reverse();
     }
 
-    if (_flippedIndex == index) {
-      _controllers[index]!.reverse();
-      setState(() => _flippedIndex = -1);
+    if (_flippedTeamApiId == key) {
+      _controllers[key]!.reverse();
+      setState(() => _flippedTeamApiId = -1);
     } else {
-      _controllers[index]!.forward();
-      setState(() => _flippedIndex = index);
+      _controllers[key]!.forward();
+      setState(() => _flippedTeamApiId = key);
     }
     HapticFeedback.lightImpact();
   }
 
-  void _selectTeam(Team team, int index) {
+  void _selectTeam(Team team) {
     setState(() => selectedTeam = team);
-    _controllers[index]?.reverse();
-    setState(() => _flippedIndex = -1);
+    _controllers[team.apiId]?.reverse();
+    setState(() => _flippedTeamApiId = -1);
     HapticFeedback.mediumImpact();
   }
 
@@ -159,13 +162,12 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 itemCount: teams.length,
                 itemBuilder: (context, index) {
-                  _initController(index);
                   final team = teams[index];
                   final isSelected = selectedTeam?.apiId == team.apiId;
 
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 14),
-                    child: _buildFlipCard(team, index, isSelected),
+                    child: _buildFlipCard(team, isSelected),
                   );
                 },
               ),
@@ -177,12 +179,12 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
     );
   }
 
-  Widget _buildFlipCard(Team team, int index, bool isSelected) {
-    _initController(index);
-    final animation = _animations[index]!;
+  Widget _buildFlipCard(Team team, bool isSelected) {
+    _initController(team.apiId);
+    final animation = _animations[team.apiId]!;
 
     return GestureDetector(
-      onTap: () => _flipCard(index),
+      onTap: () => _flipCard(team),
       child: AnimatedBuilder(
         animation: animation,
         builder: (context, _) {
@@ -194,13 +196,13 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
               ..setEntry(3, 2, 0.001)
               ..rotateY(angle),
             alignment: Alignment.center,
-            child: isBack
-                ? Transform(
-                    transform: Matrix4.identity()..rotateY(pi),
-                    alignment: Alignment.center,
-                    child: _buildCardBack(team, index),
-                  )
-                : _buildCardFront(team, isSelected),
+child: isBack
+                    ? Transform(
+                        transform: Matrix4.identity()..rotateY(pi),
+                        alignment: Alignment.center,
+                        child: _buildCardBack(team),
+                      )
+                    : _buildCardFront(team, isSelected),
           );
         },
       ),
@@ -264,7 +266,7 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
     );
   }
 
-  Widget _buildCardBack(Team team, int index) {
+  Widget _buildCardBack(Team team) {
     final info = team.expectations;
 
     return Container(
@@ -309,7 +311,7 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
                 ),
               ),
               GestureDetector(
-                onTap: () => _flipCard(index),
+                onTap: () => _flipCard(team),
                 child: const Icon(Icons.close_rounded,
                     color: Colors.white24, size: 18),
               ),
@@ -330,7 +332,7 @@ class _TeamSelectionScreenState extends State<TeamSelectionScreen>
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: () => _selectTeam(team, index),
+              onPressed: () => _selectTeam(team),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFDEFF9A),
                 foregroundColor: Colors.black,

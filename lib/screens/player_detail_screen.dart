@@ -7,6 +7,28 @@ import '../core/database_service.dart';
 import '../core/finance_service.dart';
 import 'transfer_negotiation_screen.dart';
 
+/// Cached text styles to avoid recreating on every build
+class _PlayerDetailStyles {
+  static final TextStyle appBarTitle = GoogleFonts.urbanist(
+    fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.5);
+  static final TextStyle label = GoogleFonts.urbanist(
+    color: Colors.white38, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.1);
+  static final TextStyle value = GoogleFonts.urbanist(
+    color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16);
+  static final TextStyle valueAverage = GoogleFonts.urbanist(
+    color: const Color(0xFFDEFF9A), fontWeight: FontWeight.w900, fontSize: 28);
+  static final TextStyle buttonText = GoogleFonts.urbanist(
+    fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5);
+  static final TextStyle buttonTextSmall = GoogleFonts.urbanist(
+    fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.2);
+  static final TextStyle dialogTitle = GoogleFonts.urbanist(
+    color: Colors.white, fontWeight: FontWeight.bold);
+  static final TextStyle injuryText = GoogleFonts.urbanist(
+    color: Colors.redAccent, fontWeight: FontWeight.bold);
+  static final TextStyle suspendedText = GoogleFonts.urbanist(
+    color: Colors.amber, fontWeight: FontWeight.bold);
+}
+
 class PlayerDetailScreen extends StatefulWidget {
   final Player player;
   final DatabaseService dbService;
@@ -49,7 +71,7 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen> {
       appBar: AppBar(
         title: Text(
           _currentPlayer.name.toUpperCase(), 
-          style: GoogleFonts.urbanist(fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 1.5)
+          style: _PlayerDetailStyles.appBarTitle
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -152,23 +174,8 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label.toUpperCase(), 
-            style: GoogleFonts.urbanist(
-              color: Colors.white38, 
-              fontSize: 12, 
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.1
-            )
-          ),
-          Text(
-            value, 
-            style: GoogleFonts.urbanist(
-              color: isAverage ? const Color(0xFFDEFF9A) : Colors.white, 
-              fontWeight: FontWeight.w900, 
-              fontSize: isAverage ? 28 : 16
-            )
-          ),
+          Text(label.toUpperCase(), style: _PlayerDetailStyles.label),
+          Text(value, style: isAverage ? _PlayerDetailStyles.valueAverage : _PlayerDetailStyles.value),
         ],
       ),
     );
@@ -186,7 +193,7 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen> {
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
                 'LESIONADO — ${_currentPlayer.injuredDays} días',
-                style: GoogleFonts.urbanist(color: Colors.redAccent, fontWeight: FontWeight.bold),
+                style: _PlayerDetailStyles.injuryText,
               ),
             ),
           if (_currentPlayer.suspendedMatches > 0)
@@ -194,7 +201,7 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen> {
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
                 'SANCIONADO — ${_currentPlayer.suspendedMatches} partido(s)',
-                style: GoogleFonts.urbanist(color: Colors.amber, fontWeight: FontWeight.bold),
+                style: _PlayerDetailStyles.suspendedText,
               ),
             ),
 
@@ -221,10 +228,7 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen> {
                 );
                 _refreshPlayer();
               },
-              child: Text(
-                "NEGOCIAR FICHAJE",
-                style: GoogleFonts.urbanist(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5),
-              ),
+              child: Text("NEGOCIAR FICHAJE", style: _PlayerDetailStyles.buttonText),
             ),
           ] else ...[
             // PANEL DE GESTIÓN INTERNA DE NUESTRO PROPIO FUTBOLISTA
@@ -239,10 +243,7 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen> {
               ),
               onPressed: () => _renewContractDialog(context),
               icon: const Icon(Icons.history_edu, size: 20),
-              label: Text(
-                "RENOVAR CONTRATO",
-                style: GoogleFonts.urbanist(fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.2),
-              ),
+              label: Text("RENOVAR CONTRATO", style: _PlayerDetailStyles.buttonTextSmall),
             ),
             const SizedBox(height: 12),
 
@@ -297,7 +298,7 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen> {
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: const Color(0xFF0F172A),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('RENOVACIÓN DE PLANTILLA', style: GoogleFonts.urbanist(color: Colors.white, fontWeight: FontWeight.bold)),
+          title: Text('RENOVACIÓN DE PLANTILLA', style: _PlayerDetailStyles.dialogTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,

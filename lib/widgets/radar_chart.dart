@@ -8,6 +8,7 @@ class PlayerRadarChartPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
     const angleStep = (2 * pi) / 5; // 5 estadísticas principales
@@ -33,7 +34,8 @@ class PlayerRadarChartPainter extends CustomPainter {
 
     final path = Path();
     for (var i = 0; i < 5; i++) {
-      final statValue = stats[i] / 100.0;
+      final raw = i < stats.length ? stats[i] : 0;
+      final statValue = (raw.clamp(0, 100)) / 100.0;
       final x = center.dx + radius * statValue * cos(angleStep * i - pi / 2);
       final y = center.dy + radius * statValue * sin(angleStep * i - pi / 2);
 
@@ -50,5 +52,12 @@ class PlayerRadarChartPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(covariant PlayerRadarChartPainter oldDelegate) {
+    // Only repaint if stats actually changed
+    if (oldDelegate.stats.length != stats.length) return true;
+    for (var i = 0; i < stats.length; i++) {
+      if (oldDelegate.stats[i] != stats[i]) return true;
+    }
+    return false;
+  }
 }

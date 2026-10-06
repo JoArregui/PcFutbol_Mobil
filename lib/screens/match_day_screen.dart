@@ -63,6 +63,10 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
   double _medicoLevel = 1;
   String _matchMode = 'resumen';
 
+  // Batch UI updates to reduce rebuilds
+  final List<MatchEvent> _pendingEvents = [];
+  Timer? _batchTimer;
+
   static const int _maxSubstitutions = 5;
 
   Team get _home => widget.userIsHome ? widget.userTeam : widget.opponent;
@@ -92,7 +96,17 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
   @override
   void dispose() {
     _subscription?.cancel();
+    _batchTimer?.cancel();
     super.dispose();
+  }
+
+  void _flushPendingEvents() {
+    if (_pendingEvents.isEmpty || !mounted) return;
+    setState(() {
+      // insertAll at position 0 with reversed list = O(n) instead of O(n²)
+      _history.insertAll(0, _pendingEvents.reversed);
+      _pendingEvents.clear();
+    });
   }
 
   Future<void> _prepareMatch() async {
@@ -329,22 +343,26 @@ class _MatchDayScreenState extends State<MatchDayScreen> {
     if (!mounted || _matchFinished) return;
 
     _fullTimeline.add(e);
+    _pendingEvents.add(e);
 
-    setState(() {
-      _currentMinute = e.minute;
-      _homeScore = e.homeScore ?? _homeScore;
-      _awayScore = e.awayScore ?? _awayScore;
-      if (e.description.isNotEmpty) {
-        _history.insert(0, e);
-      }
-    });
+    _currentMinute = e.minute;
+    _homeScore = e.homeScore ?? _homeScore;
+    _awayScore = e.awayScore ?? _awayScore;
+
+    // Batch UI updates every 100ms to reduce rebuilds
+    _batchTimer?.cancel();
+    _batchTimer = Timer(const Duration(milliseconds: 100), _flushPendingEvents);
 
     if (e.isHalftime) {
+      _batchTimer?.cancel();
+      _flushPendingEvents();
       _onHalftimeReached();
       return;
     }
 
     if (e.isFullTime) {
+      _batchTimer?.cancel();
+      _flushPendingEvents();
       _onFullTime();
     }
   }

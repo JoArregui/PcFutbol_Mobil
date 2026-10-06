@@ -23,7 +23,7 @@ class Team {
   final String stadium;
   final int stadiumCapacity;
   final String logoUrl;
-  final int budget;
+  int budget; // mutable: adjusted per season
   
   // Clasificación de la temporada anterior (1-20)
   int previousSeasonPosition = 10;
@@ -127,16 +127,18 @@ class Team {
   static int calculateAdjustedBudget(int baseBudget, int previousPosition, double squadAverage) {
     // Ajuste por posición: mejor posición = más presupuesto
     double positionMultiplier = 1.0;
-    if (previousPosition <= 4) positionMultiplier = 1.3;
-    else if (previousPosition <= 8) positionMultiplier = 1.15;
+    if (previousPosition <= 4) {
+      positionMultiplier = 1.3;
+    } else if (previousPosition <= 8) positionMultiplier = 1.15;
     else if (previousPosition <= 12) positionMultiplier = 1.0;
     else if (previousPosition <= 17) positionMultiplier = 0.85;
     else positionMultiplier = 0.75;
     
     // Ajuste por media de plantilla: mejor media = más presupuesto
     double qualityMultiplier = 1.0;
-    if (squadAverage >= 80) qualityMultiplier = 1.25;
-    else if (squadAverage >= 75) qualityMultiplier = 1.1;
+    if (squadAverage >= 80) {
+      qualityMultiplier = 1.25;
+    } else if (squadAverage >= 75) qualityMultiplier = 1.1;
     else if (squadAverage >= 70) qualityMultiplier = 1.0;
     else if (squadAverage >= 65) qualityMultiplier = 0.9;
     else qualityMultiplier = 0.8;

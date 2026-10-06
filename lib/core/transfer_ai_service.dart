@@ -87,6 +87,11 @@ class TransferAiService {
     await generateMatchdayOffers(userTeamApiId, currentMatchday);
   }
 
+  int _absoluteMd(GameSave save, int relativeMd) {
+    final total = save.totalMatchdays > 0 ? save.totalMatchdays : 38;
+    return (save.seasonNumber - 1) * total + relativeMd;
+  }
+
   Future<void> generateMatchdayOffers(int userTeamApiId, int nextMatchday) async {
     final save = await isar.gameSaves.get(1);
     if (save == null || save.seasonFinished) return;
@@ -138,7 +143,7 @@ class TransferAiService {
       ..status = OfferStatus.pending
       ..isForOurPlayer = true
       ..createdAt = DateTime.now()
-      ..expiresOnMatchday = nextMatchday + 2;
+      ..expiresOnMatchday = _absoluteMd(save, nextMatchday) + 2;
 
     await isar.writeTxn(() => isar.transferOffers.put(offer));
 
@@ -173,6 +178,7 @@ class TransferAiService {
 
   Future<void> _incomingLoanOffer(
       int userTeamApiId, List<Team> teams, int md) async {
+    if (teams.isEmpty) return;
     final foreign = await isar.players
         .filter()
         .teamApiIdGreaterThan(0)
@@ -199,6 +205,10 @@ class TransferAiService {
     final senderPrestige = _prestige(from.name);
     if (senderPrestige - userPrestige > 1 && _rng.nextDouble() < 0.65) return;
 
+    final loanSave = await isar.gameSaves.get(1);
+    final expiresAbs = loanSave != null
+        ? _absoluteMd(loanSave, md) + 2
+        : md + 2;
     await isar.writeTxn(() => isar.transferOffers.put(TransferOffer()
       ..playerId = p.id
       ..counterpartyTeamApiId = from.apiId
@@ -209,7 +219,7 @@ class TransferAiService {
       ..status = OfferStatus.pending
       ..isForOurPlayer = false
       ..createdAt = DateTime.now()
-      ..expiresOnMatchday = md + 2));
+      ..expiresOnMatchday = expiresAbs));
 
     await MessageService(isar).add(
       title: 'Cesión disponible',
@@ -222,12 +232,30 @@ class TransferAiService {
 
   Future<List<TransferOffer>> pendingOffers() async {
     final save = await isar.gameSaves.get(1);
-    final md = save?.currentMatchday ?? 1;
+    final md = save != null ? _absoluteMd(save, save.currentMatchday) : 1;
     final all = await isar.transferOffers
         .filter()
         .statusEqualTo(OfferStatus.pending)
         .findAll();
-    return all.where((o) => o.expiresOnMatchday >= md).toList();
+    // Compatibilidad: ofertas viejas con jornada relativa (<=38) se comparan
+    // con jornada relativa; nuevas con absoluta.
+    final relMd = save?.currentMatchday ?? 1;
+    final result = all.where((o) {
+      if (o.expiresOnMatchday > 1000) return o.expiresOnMatchday >= md;
+      // Heurística: si el valor parece absoluto (>38) comparar absoluto,
+      // si no, comparar relativo para no ocultar ofertas legacy.
+      if (o.expiresOnMatchday > 38) return o.expiresOnMatchday >= md;
+      return o.expiresOnMatchday >= relMd;
+    }).toList();
+    // Limpieza: marcar expiradas para no hinchar la tabla.
+    final expired = all.where((o) => !result.contains(o)).toList();
+    for (final e in expired) {
+      e.status = OfferStatus.expired;
+    }
+    if (expired.isNotEmpty) {
+      await isar.writeTxn(() => isar.transferOffers.putAll(expired));
+    }
+    return result;
   }
 
   // ── Aceptar / rechazar ───────────────────────────────────────────────────
@@ -237,12 +265,21 @@ class TransferAiService {
     if (player == null) return 'Jugador no encontrado.';
 
     if (offer.isForOurPlayer && offer.offerType == OfferType.purchase) {
+      // No dejar plantilla bajo mínimos (igual que FinanceService.sellPlayer).
+      final pros = await isar.players
+          .filter()
+          .teamApiIdEqualTo(userTeamApiId)
+          .isYouthEqualTo(false)
+          .findAll();
+      if (pros.length <= 16) {
+        return 'La directiva exige mínimo 16 jugadores (venta bloqueada).';
+      }
       final finance = await isar.clubFinances.get(1);
       if (finance == null) return 'Error financiero.';
       finance.balance += offer.amount;
       finance.transferBudget += offer.amount * 0.5;
       finance.wageBill =
-          (finance.wageBill - player.salary).clamp(0, double.infinity);
+          (finance.wageBill - player.salary).clamp(0, double.infinity).toDouble();
       await isar.writeTxn(() async {
         await isar.clubFinances.put(finance);
         await isar.players.delete(player.id);
@@ -258,20 +295,28 @@ class TransferAiService {
           .apiIdEqualTo(offer.counterpartyTeamApiId)
           .findFirst();
       if (to == null) return 'Club no encontrado.';
-      await LoanService(isar)
+      final res = await LoanService(isar)
           .loanOutPlayer(player, to, userTeamApiId, offer.loanMatchdays);
+      if (res.startsWith('No puedes') ||
+          res.startsWith('Sin partida') ||
+          res.startsWith('El jugador')) {
+        return res;
+      }
       offer.status = OfferStatus.accepted;
       await isar.writeTxn(() => isar.transferOffers.put(offer));
       return 'Cesión salida aceptada (${offer.loanMatchdays} jornadas).';
     }
 
     if (!offer.isForOurPlayer && offer.offerType == OfferType.loanIn) {
-      await LoanService(isar).loanInPlayer(
+      final res = await LoanService(isar).loanInPlayer(
         player,
         offer.counterpartyTeamApiId,
         userTeamApiId,
         offer.loanMatchdays,
       );
+      if (res.startsWith('El jugador') || res.startsWith('Sin partida')) {
+        return res;
+      }
       offer.status = OfferStatus.accepted;
       await isar.writeTxn(() => isar.transferOffers.put(offer));
       return 'Cesión entrante aceptada (${offer.loanMatchdays} jornadas).';

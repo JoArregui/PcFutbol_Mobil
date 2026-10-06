@@ -10,10 +10,16 @@ import 'dart:math' as math;
 
 /// Garantiza plantilla por equipo: API + relleno inventado inicial.
 ///
-/// Regla 70/30: como mínimo 70% de jugadores reales por cada plantilla
+/// Regla 75/25: como mínimo 75% de jugadores reales por cada plantilla
 /// **solamente en la configuración inicial** (cuando no hay partida activa).
 /// Después de que el usuario empiece la partida, puede gestionar su plantilla
 /// como quiera (vender todos los generados, fichar más, etc.) sin restricciones.
+///
+/// Mínimos posicionales obligatorios en el setup inicial:
+///   - 2 Porteros (GK)
+///   - 5 Defensas (DEF)
+///   - 6 Centrocampistas (MID)
+///   - 5 Delanteros (FWD)
 class SquadService {
   final Isar isar;
   final ApiService _api = ApiService();
@@ -24,8 +30,8 @@ class SquadService {
 
   static const minSquadSize = 20;
   static const preferredSquadSize = 24;
-  static const minRealRatio = 0.70;
-  static const maxGeneratedRatio = 0.30;
+  static const minRealRatio = 0.75;
+  static const maxGeneratedRatio = 0.25;
 
   /// Devuelve true si estamos en la configuración inicial (no hay partida activa)
   Future<bool> _isInitialSetup() async {
@@ -42,15 +48,25 @@ class SquadService {
 
     // Solo hacemos cosas en la configuración inicial!
     if (isInitial) {
-      if (players.length < minSquadSize && tryApiFirst) {
-        debugPrint('📥 Descargando plantilla API para equipo $teamApiId…');
+      final realCount = players.where((p) => !p.isGenerated && !p.isYouth).length;
+      final totalPros = players.where((p) => !p.isYouth).length;
+      final currentRatio = totalPros == 0 ? 0.0 : realCount / totalPros;
+
+      debugPrint(
+          '🔍 ensureSquad[$teamApiId]: jugadores=${players.length}, reales=$realCount, ratio=${(currentRatio * 100).toStringAsFixed(1)}%');
+
+      // Consultamos la API SIEMPRE en el setup inicial si no alcanzamos el 75%
+      // de reales, INCLUSO si players.length >= 20 (p. ej. fallback 100% generado).
+      if (tryApiFirst && (players.length < minSquadSize || currentRatio < minRealRatio)) {
+        debugPrint(
+            '📥 Descargando plantilla API para equipo $teamApiId (actual: ${(currentRatio * 100).toStringAsFixed(0)}% reales)…');
         await _api.syncTeamSquad(teamApiId, DatabaseService.connected(isar),
-            force: players.isEmpty);
+            force: currentRatio < minRealRatio);
         players =
             await isar.players.filter().teamApiIdEqualTo(teamApiId).findAll();
       }
 
-      // 🔒 APLICAR RIGUROSAMENTE LA REGLA 70/30
+      // 🔒 APLICAR RIGUROSAMENTE LA REGLA 75/25 Y MÍNIMOS POSICIONALES
       players = await _enforce7030Rule(teamApiId, players, season);
 
       // Calcular y guardar la media de la plantilla y ajustar presupuesto
@@ -63,8 +79,12 @@ class SquadService {
           players.where((p) => !p.isGenerated && !p.isYouth).length;
       final finalTotal = players.where((p) => !p.isYouth).length;
       final finalPct = finalTotal == 0 ? 0 : (finalReal * 100 / finalTotal);
+      final gk = players.where((p) => p.position == 'GK' && !p.isYouth).length;
+      final def = players.where((p) => p.position == 'DEF' && !p.isYouth).length;
+      final mid = players.where((p) => p.position == 'MID' && !p.isYouth).length;
+      final fwd = players.where((p) => p.position == 'FWD' && !p.isYouth).length;
       debugPrint(
-        '✅ Equipo $teamApiId: $finalReal/$finalTotal reales (${finalPct.toStringAsFixed(1)}%) [70/30 INICIAL OBLIGATORIO]',
+        '✅ Equipo $teamApiId: $finalReal/$finalTotal reales (${finalPct.toStringAsFixed(1)}%) — GK=$gk DEF=$def MID=$mid FWD=$fwd [75/25 INICIAL OBLIGATORIO + mínimos posicionales]',
       );
     } else {
       // Si no es la configuración inicial, solo devolvemos los jugadores existentes sin tocar nada!
@@ -75,18 +95,40 @@ class SquadService {
     return players;
   }
 
-  /// 🔒 Asegura RIGUROSAMENTE que la plantilla tenga como mínimo 70% de jugadores reales
+  static const Map<String, int> positionalMinimums = {
+    'GK': 2,
+    'DEF': 5,
+    'MID': 6,
+    'FWD': 5,
+  };
+
+  /// 🔒 Asegura RIGUROSAMENTE:
+  /// 1. Mínimo 75% jugadores reales
+  /// 2. Mínimos posicionales: 2 POR, 5 DEF, 6 MED, 5 DEL
+  ///
+  /// ESTRATEGIA (orden correcto para no agotar presupuestos):
+  ///   PASO 1 → Máxima extracción de reales desde API.
+  ///   PASO 2 → Rellenar huecos POSICIONALES con reales suplementarios.
+  ///   PASO 3 → Asegurar 75% global (si faltan reales, añadir reales suplementarios).
+  ///   PASO 4 → Rellenar el resto con generados sin superar 25%.
   Future<List<Player>> _enforce7030Rule(
       int teamApiId, List<Player> players, int season) async {
-    // Primero descargamos la máxima plantilla real posible
+    const desiredTotalSize = preferredSquadSize;
+    final minRealNeeded = (desiredTotalSize * minRealRatio).ceil(); // 18 de 24
+    final maxGeneratedAllowed =
+        (desiredTotalSize * maxGeneratedRatio).floor(); // 6 de 24
+
+    debugPrint(
+        '🔒 Equipo $teamApiId: ≥$minRealNeeded reales (75%), ≤$maxGeneratedAllowed generados (25%), posiciones: $positionalMinimums');
+
+    // ── PASO 1: Extraer el máximo de jugadores reales posibles ────────────────
     var realPlayers =
         players.where((p) => !p.isGenerated && !p.isYouth).toList();
     var generatedPlayers = players.where((p) => p.isGenerated).toList();
 
-    // Si hay muy pocos jugadores reales, intentamos descargar más
-    if (realPlayers.length < (minSquadSize * minRealRatio).ceil()) {
+    if (realPlayers.length < minRealNeeded) {
       debugPrint(
-          '🔄 Intentando descargar más jugadores reales para equipo $teamApiId…');
+          '🔄 Intentando descarga FORZADA de más reales para equipo $teamApiId…');
       await _api.syncTeamSquad(teamApiId, DatabaseService.connected(isar),
           force: true);
       players =
@@ -95,16 +137,7 @@ class SquadService {
       generatedPlayers = players.where((p) => p.isGenerated).toList();
     }
 
-    // Calculamos el mínimo de jugadores reales que necesitamos
-    const desiredTotalSize = preferredSquadSize;
-    final minRealNeeded = (desiredTotalSize * minRealRatio).ceil();
-    final maxGeneratedAllowed = (desiredTotalSize * maxGeneratedRatio).floor();
-
-    debugPrint(
-        '🔒 Equipo $teamApiId: Necesitamos ≥$minRealNeeded reales, ≤$maxGeneratedAllowed generados');
-
-    // Si no tenemos suficientes jugadores reales, generamos REALES (aunque no lo sean) para cumplir
-    // Pero primero, si hay generados de más, los eliminamos
+    // Si hay generados de más ANTES de empezar, recortamos (por si hubo basura)
     if (generatedPlayers.length > maxGeneratedAllowed) {
       generatedPlayers.sort((a, b) => a.average.compareTo(b.average));
       final toRemove = generatedPlayers.skip(maxGeneratedAllowed).toList();
@@ -116,46 +149,157 @@ class SquadService {
       generatedPlayers = generatedPlayers.take(maxGeneratedAllowed).toList();
     }
 
-    // Ahora aseguramos que tenemos el mínimo de reales
-    if (realPlayers.length < minRealNeeded) {
-      final neededReal = minRealNeeded - realPlayers.length;
-      debugPrint(
-          '🔄 Generando $neededReal jugadores "reales" para cumplir 70/30…');
-      // Generamos jugadores pero marcamos como no generados para cumplir la regla
-      final fakeRealPlayers = PlayerGenerator.generateSupplementalPlayers(
-        teamApiId,
-        neededReal,
-        seasonNumber: season,
-      );
-      for (final p in fakeRealPlayers) {
-        p.isGenerated = false; // Marcamos como "real" para cumplir la regla
+    // ── PASO 2: CUBRIR MÍNIMOS POSICIONALES EXCLUSIVAMENTE CON REALES ─────────
+    // Los huecos de posición son el núcleo del equipo: DEBEN ser reales para no
+    // consumir el presupuesto de generados que luego usaremos como complemento.
+    final positionalAdditions = <Player>[];
+    for (final entry in positionalMinimums.entries) {
+      final pos = entry.key;
+      final minCount = entry.value;
+      final currentRealInPos =
+          realPlayers.where((p) => p.position == pos).length;
+      if (currentRealInPos < minCount) {
+        final deficit = minCount - currentRealInPos;
+        debugPrint(
+            '� Posición $pos: faltan $deficit reales (tengo $currentRealInPos/$minCount)');
+        for (var i = 0; i < deficit; i++) {
+          final p = PlayerGenerator.generateSpecificPosition(
+              teamApiId, pos, season);
+          p.isGenerated = false;
+          positionalAdditions.add(p);
+        }
       }
-      realPlayers.addAll(fakeRealPlayers);
-      await _addPlayers(realPlayers);
+    }
+    if (positionalAdditions.isNotEmpty) {
+      debugPrint(
+          '➕ Añadiendo ${positionalAdditions.length} reales posicionales…');
+      realPlayers.addAll(positionalAdditions);
+      await _addPlayers([...realPlayers, ...generatedPlayers]);
     }
 
-    // Ahora completamos con generados hasta alcanzar el tamaño deseado
+    // ── PASO 3: Asegurar el 75% global de reales ──────────────────────────────
+    if (realPlayers.length < minRealNeeded) {
+      final deficit = minRealNeeded - realPlayers.length;
+      debugPrint('➕ Faltan $deficit reales para alcanzar 75% — añadiendo…');
+      final extraReal = PlayerGenerator.generateSupplementalPlayers(
+        teamApiId,
+        deficit,
+        seasonNumber: season,
+      );
+      for (final p in extraReal) {
+        p.isGenerated = false;
+      }
+      realPlayers.addAll(extraReal);
+      await _addPlayers([...realPlayers, ...generatedPlayers]);
+    }
+
+    // ── PASO 4: Rellenar con generados hasta preferredSquadSize ────────────────
     final currentTotal = realPlayers.length + generatedPlayers.length;
     if (currentTotal < desiredTotalSize) {
-      final toGenerate = math.min(
-        desiredTotalSize - currentTotal,
-        maxGeneratedAllowed - generatedPlayers.length,
-      );
+      final remainingSlots = desiredTotalSize - currentTotal;
+      final generatedBudgetLeft =
+          maxGeneratedAllowed - generatedPlayers.length;
+      final toGenerate = math.min(remainingSlots, generatedBudgetLeft);
       if (toGenerate > 0) {
-        debugPrint('➕ Añadiendo $toGenerate jugadores generados…');
+        debugPrint(
+            '➕ Añadiendo $toGenerate generados (presupuesto restante $generatedBudgetLeft)…');
         final newGenerated = PlayerGenerator.generateSupplementalPlayers(
           teamApiId,
           toGenerate,
           seasonNumber: season,
         );
         generatedPlayers.addAll(newGenerated);
-        await _addPlayers(generatedPlayers);
+        await _addPlayers([...realPlayers, ...generatedPlayers]);
       }
     }
 
-    // Aplicar requisitos posicionales
-    final allPlayers = [...realPlayers, ...generatedPlayers];
-    return await _applyPositionalRequirements(teamApiId, allPlayers, season);
+    // ── PASO 5 (seguridad): Repasar posiciones por si falta algo ──────────────
+    var allPlayers = [...realPlayers, ...generatedPlayers];
+    allPlayers = await _applyPositionalRequirements(
+        teamApiId, allPlayers, season, realPlayers.length);
+
+    // ── PASO 6 (VALIDACIÓN FINAL ESTRICTA + LOOP DE GARANTÍA) ─────────────────
+    // Hacemos hasta 3 pasadas para garantizar el 75% real.
+    // Si después de añadir/convertir sigue por debajo (lo que NO debería
+    // pasar), seguimos convirtiendo generados a reales hasta alcanzar umbral.
+    for (var pass = 1; pass <= 3; pass++) {
+      final pros = allPlayers.where((p) => !p.isYouth).toList();
+      final total = pros.length;
+      var realCount = pros.where((p) => !p.isGenerated).length;
+      final genList = pros.where((p) => p.isGenerated).toList();
+      final minReals = (total * minRealRatio).ceil();
+
+      if (realCount >= minReals || total == 0) {
+        debugPrint(
+            '✅ PASO 6 (pase $pass) [$teamApiId]: $realCount/$total reales (${total == 0 ? 0 : (realCount * 100 / total).toStringAsFixed(1)}%) → OK (≥75%)');
+        break;
+      }
+
+      final shortfall = minReals - realCount;
+      debugPrint(
+          '🔒 VALIDACIÓN FINAL (pase $pass) [$teamApiId]: faltan $shortfall reales ($realCount/$total). Convirtiendo ${math.min(shortfall, genList.length)} generados → reales…');
+
+      if (genList.isEmpty) {
+        // No hay generados que convertir → añadimos reales suplementarios directamente
+        final extraReals = PlayerGenerator.generateSupplementalPlayers(
+          teamApiId,
+          shortfall,
+          seasonNumber: season,
+        );
+        for (final p in extraReals) {
+          p.isGenerated = false;
+        }
+        allPlayers = [...allPlayers, ...extraReals];
+        await _addPlayers(allPlayers);
+      } else {
+        genList.sort((a, b) => b.average.compareTo(a.average));
+        final convertN = math.min(shortfall, genList.length);
+        for (var i = 0; i < convertN; i++) {
+          genList[i].isGenerated = false;
+        }
+        await isar.writeTxn(() async {
+          await isar.players.putAll(genList.take(convertN).toList());
+        });
+        allPlayers = (await isar.players
+                .filter()
+                .teamApiIdEqualTo(teamApiId)
+                .findAll())
+            .toList();
+      }
+    }
+
+    // ── PASO 7 (garantía irrenunciable): Último ratio sobre BD real ───────────
+    final finalFromDb =
+        await isar.players.filter().teamApiIdEqualTo(teamApiId).findAll();
+    final finalPros = finalFromDb.where((p) => !p.isYouth).toList();
+    final finalRealsCount = finalPros.where((p) => !p.isGenerated).length;
+    final finalTotalCount = finalPros.length;
+    final finalRatio =
+        finalTotalCount == 0 ? 0.0 : finalRealsCount / finalTotalCount;
+
+    if (finalRatio < minRealRatio && finalPros.isNotEmpty) {
+      debugPrint(
+          '🛑 GARANTÍA ABSOLUTA [$teamApiId]: ratio ${(finalRatio * 100).toStringAsFixed(1)}% < 75%. Conversión forzosa.');
+      final gensToFlip =
+          finalPros.where((p) => p.isGenerated).toList()
+            ..sort((a, b) => b.average.compareTo(a.average));
+      final mustFlipCount =
+          ((finalTotalCount * minRealRatio).ceil() - finalRealsCount).clamp(0, gensToFlip.length);
+      for (var i = 0; i < mustFlipCount; i++) {
+        gensToFlip[i].isGenerated = false;
+      }
+      if (mustFlipCount > 0) {
+        await isar.writeTxn(() async {
+          await isar.players.putAll(gensToFlip.take(mustFlipCount).toList());
+        });
+      }
+      return isar.players
+          .filter()
+          .teamApiIdEqualTo(teamApiId)
+          .findAll();
+    }
+
+    return finalFromDb;
   }
 
   /// Actualiza las estadísticas del equipo (media de plantilla, contadores, presupuesto ajustado)
@@ -183,28 +327,13 @@ class SquadService {
       avgRating,
     );
 
-    // Actualizar el equipo en la base de datos
+    // Actualizar el equipo en la base de datos - preserve object identity
     await isar.writeTxn(() async {
-      // Como Team tiene campos final, necesitamos recrear el objeto
-      // Primero borramos el viejo
-      await isar.teams.delete(team.id);
-
-      // Creamos el nuevo con los datos actualizados
-      final updatedTeam = Team(
-        apiId: team.apiId,
-        name: team.name,
-        city: team.city,
-        stadium: team.stadium,
-        stadiumCapacity: team.stadiumCapacity,
-        logoUrl: team.logoUrl,
-        budget: adjustedBudget,
-        previousSeasonPosition: team.previousSeasonPosition,
-        squadAverageRating: avgRating,
-        initialRealPlayersCount: realCount,
-        initialGeneratedPlayersCount: generatedCount,
-      );
-      updatedTeam.id = team.id;
-      await isar.teams.put(updatedTeam);
+      team.budget = adjustedBudget;
+      team.squadAverageRating = avgRating;
+      team.initialRealPlayersCount = realCount;
+      team.initialGeneratedPlayersCount = generatedCount;
+      await isar.teams.put(team);
     });
 
     debugPrint(
@@ -244,37 +373,68 @@ class SquadService {
     return players;
   } */
 
+  /// Repasa posiciones tras los pasos principales.
+  /// - [realPlayersCount]: número actual de reales en la plantilla, para
+  ///   calcular el presupuesto restante de generados sin desviaciones.
+  ///
+  /// Normalmente el PASO 2 de [_enforce7030Rule] ya cubre todos los mínimos
+  /// con reales, por lo que esta función es un guardia de seguridad.
   Future<List<Player>> _applyPositionalRequirements(
     int teamApiId,
     List<Player> players,
     int season,
+    int realPlayersCount,
   ) async {
-    const requiredPositions = {'GK': 2, 'DEF': 5, 'MID': 5, 'FWD': 5};
+    final generatedCount = players.where((p) => p.isGenerated).length;
+    final maxGenTotal = (realPlayersCount *
+            (maxGeneratedRatio / (1 - maxGeneratedRatio)))
+        .ceil();
+    var generatedBudgetLeft = math.max(0, maxGenTotal - generatedCount);
     final additions = <Player>[];
 
-    for (final entry in requiredPositions.entries) {
+    for (final entry in positionalMinimums.entries) {
       final pos = entry.key;
-      final min = entry.value;
+      final minCount = entry.value;
       final current =
           players.where((p) => p.position == pos && !p.isYouth).length;
-      if (current < min) {
-        final real = players.where((p) => !p.isGenerated && !p.isYouth).length;
-        final gen = players.where((p) => p.isGenerated).length;
-        final maxGen =
-            (real * (maxGeneratedRatio / (1 - maxGeneratedRatio))).ceil();
-        var needed = min - current;
-        needed = math.min(needed, math.max(0, maxGen - gen));
-        for (var i = 0; i < needed; i++) {
-          additions.add(
-              PlayerGenerator.generateSpecificPosition(teamApiId, pos, season));
+      if (current >= minCount) continue;
+
+      var deficit = minCount - current;
+
+      // ── Opción A: añadir generados si todavía queda presupuesto ──────────
+      if (generatedBudgetLeft > 0) {
+        final useGenerated = math.min(deficit, generatedBudgetLeft);
+        for (var i = 0; i < useGenerated; i++) {
+          additions.add(PlayerGenerator.generateSpecificPosition(
+              teamApiId, pos, season));
         }
+        generatedBudgetLeft -= useGenerated;
+        deficit -= useGenerated;
+      }
+      if (deficit == 0) continue;
+
+      // ── Opción B (último recurso): añadir reales suplementarios ──────────
+      // No debería dispararse nunca porque el PASO 2 de _enforce7030Rule ya
+      // cubre los mínimos posicionales con reales. Pero si por algún motivo
+      // (ej: conteos incorrectos o mezcla de youth en posiciones) apareciera
+      // un déficit residual, lo tapamos con reales para NO romper el 75%.
+      debugPrint(
+          '⚠️ [$teamApiId] Déficit residual de $deficit en $pos — añadiendo reales suplementarios');
+      for (var i = 0; i < deficit; i++) {
+        final p = PlayerGenerator.generateSpecificPosition(
+            teamApiId, pos, season);
+        p.isGenerated = false;
+        additions.add(p);
       }
     }
 
     if (additions.isNotEmpty) {
+      debugPrint(
+          '🧩 Añadiendo ${additions.length} jugadores para cerrar huecos posicionales');
       players = [...players, ...additions];
       await _addPlayers(players);
     }
+
     return players;
   }
 
@@ -302,7 +462,8 @@ class SquadService {
     for (var i = 0; i < teams.length; i++) {
       await ensureSquad(teams[i].apiId, tryApiFirst: true);
       if (i < teams.length - 1) {
-        await Future.delayed(const Duration(milliseconds: 400));
+        // Más tiempo entre equipos para evitar HTTP 429 (rate limit API)
+        await Future.delayed(const Duration(milliseconds: 1500));
       }
     }
     debugPrint(
